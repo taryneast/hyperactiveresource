@@ -68,6 +68,10 @@ class HyperactiveResource < ActiveResource::Base
     super 
   end
   
+  def respond_to?(method)
+    columns.include?(method.to_sym) || super
+  end
+  
   protected  
   
   def save_nested
