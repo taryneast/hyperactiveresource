@@ -1,6 +1,7 @@
 require File.dirname(__FILE__) + '/spec_helper'
-require RAILS_ROOT + '/vendor/rails/activeresource/lib/active_resource/http_mock'
-require "http_mock_mod"
+require "active_resource"
+require "active_resource/http_mock"
+require 'hyperactive_resource'
 
 class TestResource < HyperactiveResource
   self.site = 'http://localhost:3000' #This should never get called
