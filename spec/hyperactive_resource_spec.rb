@@ -288,6 +288,13 @@ describe "An active resource that extends abstract resource" do
     @it.respond_to?(:something).should be_true
   end
 
+  it "should return true if respond_to? with a column setter is called" do
+    @it.instance_eval do
+      self.columns = [ :something ]
+    end    
+    @it.respond_to?(:something=).should be_true
+  end
+
   it "should return nil if a belong_to column's id getter is called rather than method_missing as in ActiveResource" do
     @it.instance_eval do
       self.columns = [] #You shouldn't need the column specified, it should infer from the belong_tos
