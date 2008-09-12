@@ -294,6 +294,10 @@ describe "An active resource that extends abstract resource" do
     end    
     @it.respond_to?(:something=).should be_true
   end
+  
+  it "should accept two arguments to respond_to? like instances of Ruby Objects do" do
+    @it.respond_to?(:object_id, true).should be_true
+  end
 
   it "should return nil if a belong_to column's id getter is called rather than method_missing as in ActiveResource" do
     @it.instance_eval do

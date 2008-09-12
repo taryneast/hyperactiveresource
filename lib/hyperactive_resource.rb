@@ -68,7 +68,7 @@ class HyperactiveResource < ActiveResource::Base
     super 
   end
   
-  def respond_to?(method)
+  def respond_to?(method, include_private = false)
     attribute_getter?(method) || attribute_setter?(method) || super
   end
   
