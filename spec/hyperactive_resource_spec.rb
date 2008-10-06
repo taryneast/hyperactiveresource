@@ -298,6 +298,19 @@ describe "An active resource that extends abstract resource" do
   it "should accept two arguments to respond_to? like instances of Ruby Objects do" do
     @it.respond_to?(:object_id, true).should be_true
   end
+  
+  it "should reposnd to new_record?" do
+    @it.respond_to?(:new_record?).should be_true
+  end
+  
+  it "should return true on new_record? if the record hasn't been saved" do
+    @it.new_record?.should be_true
+  end
+
+  it "should return false on new_record? if the record has been saved (delegating to new?)" do
+    @it.should_receive(:new?).and_return(false)
+    @it.new_record?.should be_false    
+  end
 
   it "should return nil if a belong_to column's id getter is called rather than method_missing as in ActiveResource" do
     @it.instance_eval do
