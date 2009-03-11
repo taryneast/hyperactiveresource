@@ -68,6 +68,14 @@ class HyperactiveResource < ActiveResource::Base
     super 
   end
   
+  def new_record?
+    new?
+  end
+
+  def respond_to?(method, include_private = false)
+    attribute_getter?(method) || attribute_setter?(method) || super
+  end
+  
   protected  
   
   def save_nested
@@ -376,6 +384,14 @@ class HyperactiveResource < ActiveResource::Base
     setter_method_name = "#{key}="
     self.send( setter_method_name, @attributes[key.to_s] ) if self.respond_to? setter_method_name
   end    
+  
+  def attribute_getter?(method)
+    columns.include?(method.to_sym)
+  end
+
+  def attribute_setter?(method)
+    columns.include?(method.to_s.gsub(/=$/, '').to_sym)
+  end
   
   def self.find_by( all, field, *args )
     find( all.nil? ? :first : :all, :params => { field => args[0] } )      
