@@ -68,15 +68,7 @@ class HyperactiveResource < ActiveResource::Base
     super 
   end
   
-  def new_record?
-    new?
-  end
-  
-  def respond_to?(method, include_private = false)
-    attribute_getter?(method) || attribute_setter?(method) || super
-  end
-  
-  protected
+  protected  
   
   def save_nested
     @saved_nested_resources = {}
@@ -174,7 +166,9 @@ class HyperactiveResource < ActiveResource::Base
   end     
   
   class_inheritable_accessor :has_manys
+  class_inheritable_accessor :nested_has_manys
   class_inheritable_accessor :has_ones
+  class_inheritable_accessor :nested_has_ones
   class_inheritable_accessor :belong_tos
   class_inheritable_accessor :columns
   class_inheritable_accessor :skip_to_xml_for
@@ -182,8 +176,11 @@ class HyperactiveResource < ActiveResource::Base
   
   self.nested_resources = []
   self.has_manys = []
+  self.nested_has_manys = []
   self.has_ones = []
+  self.nested_has_ones = []
   self.belong_tos = []
+
   self.columns = []
   self.skip_to_xml_for = []
 
@@ -215,10 +212,14 @@ class HyperactiveResource < ActiveResource::Base
       return belong_to_getter_method_missing(name)
     when *self.belong_to_ids
       return belong_to_id_getter_method_missing(name)
+    when *self.nested_has_manys
+      return nested_has_many_getter_method_missing(name)
     when *self.has_manys
       return has_many_getter_method_missing(name)
     when *self.has_many_ids
       return has_many_ids_getter_method_missing(name)
+    when *self.nested_has_ones
+      return nested_has_one_getter_method_missing(name)      
     when *self.has_ones
       return has_one_getter_method_missing(name)      
     end                                     
@@ -274,6 +275,12 @@ class HyperactiveResource < ActiveResource::Base
       call_setter(name, associated_models) #return
     end
   end
+
+  #Getter for a belong_to relationship checks if the _id exists and dynamically finds the object
+  def nested_has_many_getter_method_missing( name )
+    self.new? ? [] : 
+      call_setter(name, name.to_s.singularize.camelize.constantize.send(:find, :all, :from => "/#{self.class.name.underscore.pluralize}/#{self.id}/#{name}.xml" ) )
+  end
   
   def has_many_ids_getter_method_missing( name )
     association_name = remove_id(name).pluralize #(residency_ids => residencies)
@@ -287,6 +294,11 @@ class HyperactiveResource < ActiveResource::Base
   def has_one_getter_method_missing( name )
     self.new? ? nil : 
       call_setter( name, name.to_s.camelize.constantize.send("find_by_#{self.class.name.underscore}_id", self.id) )
+  end
+  
+  def nested_has_one_getter_method_missing( name )
+    self.new? ? nil : 
+      call_setter( name, name.to_s.camelize.constantize.send(:find, :one, :from => "/#{self.class.name.underscore.pluralize}/#{self.id}/#{name}.xml" ) )
   end
   
   #Convenience method used by the method_missing methods
@@ -364,14 +376,6 @@ class HyperactiveResource < ActiveResource::Base
     setter_method_name = "#{key}="
     self.send( setter_method_name, @attributes[key.to_s] ) if self.respond_to? setter_method_name
   end    
-
-  def attribute_getter?(method)
-    columns.include?(method.to_sym)
-  end
-  
-  def attribute_setter?(method)
-    columns.include?(method.to_s.gsub(/=$/, '').to_sym)
-  end
   
   def self.find_by( all, field, *args )
     find( all.nil? ? :first : :all, :params => { field => args[0] } )      
