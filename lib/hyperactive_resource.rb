@@ -406,5 +406,18 @@ class HyperactiveResource < ActiveResource::Base
     else
       super
     end
-  end    
+  end
+  
+  def self.first
+    self.find(:first)
+  end
+
+  def self.last
+    self.find(:last)
+  end
+
+  def self.all
+    self.find(:all)
+  end
+  
 end
