@@ -76,6 +76,37 @@ class HyperactiveResource < ActiveResource::Base
     attribute_getter?(method) || attribute_setter?(method) || super
   end
   
+  # copy/pasted from http://dev.rubyonrails.org/attachment/ticket/7308/reworked_activeresource_update_attributes_patch.diff
+  #
+  # Updates a single attribute and requests that the resource be saved. 
+  # 
+  # Note: Unlike ActiveRecord::Base.update_attribute, this method <b>is</b> subject to normal validation 
+  # routines as an update sends the whole body of the resource in the request.  (See Validations). 
+  # As such, this method is equivalent to calling update_attributes with a single attribute/value pair. 
+  # 
+  # Note: Also unlike ActiveRecord::Base, ActiveResource currently uses string versions of attribute 
+  # names, so use <tt>update_attribute("name", "ryan")</tt> <em>instead of</em> <tt>update_attribute(:name, "ryan")</tt>. 
+  # 
+  # If the saving fails because of a connection or remote service error, an exception will be raised.  If saving 
+  # fails because the resource is invalid then <tt>false</tt> will be returned. 
+  #     
+  def update_attribute(name, value); update_attributes(name => value); end 
+ 
+  # Updates this resource withe all the attributes from the passed-in Hash and requests that 
+  # the record be saved. 
+  # 
+  # If the saving fails because of a connection or remote service error, an exception will be raised.  If saving 
+  # fails because the resource is invalid then <tt>false</tt> will be returned. 
+  # 
+  # Note: Though this request can be made with a partial set of the resource's attributes, the full body 
+  # of the request will still be sent in the save request to the remote service.  Also note that 
+  # ActiveResource currently uses string versions of attribute 
+  # names, so use <tt>update_attributes("name" => "ryan")</tt> <em>instead of</em> <tt>update_attribute(:name => "ryan")</tt>. 
+  #     
+  def update_attributes(attributes) 
+    load(attributes) && save 
+  end
+  
   protected  
   
   def save_nested
@@ -213,6 +244,8 @@ class HyperactiveResource < ActiveResource::Base
   def method_missing(name, *args)
     return super if attributes.keys.include? name.to_s         
     
+    puts "++++++++++++++ method_missing #{name}"
+    
     case name
     when *self.columns
       return column_getter_method_missing(name)
@@ -231,6 +264,17 @@ class HyperactiveResource < ActiveResource::Base
     when *self.has_ones
       return has_one_getter_method_missing(name)      
     end                                     
+
+    # hkau
+    # something like this to support "nested xxxx="
+    #
+    # if name.to_s.ends_with?('=')
+    #   setter_name = name.to_s[0..(name.to_s.length-2)]
+    #   puts "---------- setter_name #{setter_name}"
+    #   if nested_has_ones.include?(setter_name.to_sym)
+    #     return send "#{setter_name}_id=", args[0].id
+    #   end
+    # end
 
     super
   end
@@ -287,7 +331,9 @@ class HyperactiveResource < ActiveResource::Base
   #Getter for a belong_to relationship checks if the _id exists and dynamically finds the object
   def nested_has_many_getter_method_missing( name )
     self.new? ? [] : 
-      call_setter(name, name.to_s.singularize.camelize.constantize.send(:find, :all, :from => "/#{self.class.name.underscore.pluralize}/#{self.id}/#{name}.xml" ) )
+      # call_setter(name, name.to_s.singularize.camelize.constantize.send(:find, :all, :from => "/#{self.class.name.underscore.pluralize}/#{self.id}/#{name}.xml" ) )
+      call_setter(name, BarksResource.send(:find, :all, :from => "/#{self.class.name.underscore.pluralize}/#{self.id}/#{name}.xml" ).collect { |br| re_instantiate(br) } )
+
   end
   
   def has_many_ids_getter_method_missing( name )
@@ -305,12 +351,19 @@ class HyperactiveResource < ActiveResource::Base
   end
   
   def nested_has_one_getter_method_missing( name )
+    puts "****************** nested_has_one_getter_method_missing( #{name} )"
     self.new? ? nil : 
-      call_setter( name, name.to_s.camelize.constantize.send(:find, :one, :from => "/#{self.class.name.underscore.pluralize}/#{self.id}/#{name}.xml" ) )
+      # call_setter( name, name.to_s.camelize.constantize.send(:find, :one, :from => "/#{self.class.name.underscore.pluralize}/#{self.id}/#{name}.xml" ) )
+      call_setter( name, re_instantiate(BarksResource.send(:find, :one, :from => "/#{self.class.name.underscore.pluralize}/#{self.id}/#{name}.xml" ) ))
+  end
+
+  def re_instantiate(object)
+    object.ruby_class.constantize.new(object.attributes)
   end
   
   #Convenience method used by the method_missing methods
   def call_setter( name, value )
+    puts "****************** call_setter( #{name}, #{value} )"
     self.send( "#{name}=", value )
   end
   
@@ -366,7 +419,7 @@ class HyperactiveResource < ActiveResource::Base
       value.map { |attrs| resource.new(attrs) }
     end
   end
-  
+   	
   #Called by overriden load
   def convert_to_i_if_id_field( key, value )
     #This might be an id of an association, and if they are passing in a string it should be to_ied                        
