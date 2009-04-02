@@ -19,6 +19,8 @@ class HyperactiveResource < ActiveResource::Base
     attributes.update(new_attributes)
   end
    
+  # TODO: see if we can find a way to use "super" and merge the results of
+  # the associations
   def to_xml(options = {})
     #RAILS_DEFAULT_LOGGER.debug("** Begin Dumping XML for #{self.class.name}:#{self.id}")    
     massaged_attributes = attributes.dup

@@ -56,4 +56,25 @@ Example
     address.country #Returns Country.find(5)
   etc..
 
-Copyright (c) 2008 Medical Decision Logic, released under the MIT license
+
+TODOs
+=====
+
+1) ActiveRecord style validations eg: validates_presence_of
+
+2) ability to use ActiveRecord-style nomenclature for associations eg:
+    has_many :x, :y, :z
+  instead of: 
+    has_manys [:x, :y, :z]
+
+3) proper callbacks for before/after save/create/validate etc rather than
+  bodgied-up functions called directly in the code
+
+
+N) merge of this stuff back into the real ActiveResource
+
+
+Copyright
+=========
+Copyright (c) 2008 Medical Decision Logic
+Released under the MIT license (see attached file)
