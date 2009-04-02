@@ -108,6 +108,13 @@ class HyperactiveResource < ActiveResource::Base
   def update_attributes(attributes) 
     load(attributes) && save 
   end
+
+  #  Works the same as +update_attributes+ but uses +save!+ rather than
+  #  +save+
+  #  Thus it will throw an exception if the save fails.
+  def update_attributes!(attributes)
+    load(attributes) && save! 
+  end
   
   protected  
   
