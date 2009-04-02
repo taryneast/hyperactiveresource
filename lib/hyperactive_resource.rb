@@ -25,7 +25,7 @@ class HyperactiveResource < ActiveResource::Base
     # Massage patient.id into patient_id (for every belongs_to)
     massaged_attributes.each do |key, value|
       if self.belong_tos.include? key.to_sym
-        massaged_attributes["#{key}_id"] = value.id
+        massaged_attributes["#{key}_id"] = value.id unless value.blank?
         massaged_attributes.delete(key)       
       elsif key.to_s =~ /^.*_ids$/
         massaged_attributes.delete(key)        
