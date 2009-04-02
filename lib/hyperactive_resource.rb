@@ -120,6 +120,12 @@ class HyperactiveResource < ActiveResource::Base
   end
   
   protected  
+
+  # used when somebody overloads the "attribute=" method and then wants to
+  # save the value into attributes
+  def write_attribute(key, value)
+    attributes[key.to_s] = value
+  end
   
   def save_nested
     @saved_nested_resources = {}
