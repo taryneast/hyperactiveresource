@@ -18,13 +18,7 @@ class HyperactiveResource < ActiveResource::Base
   def attributes=(new_attributes)    
     attributes.update(new_attributes)
   end
-  
-  #This is also required to behave like ARec
-  def save!
-    validate
-    ( errors.empty? && save ) || raise(RecordNotSaved)
-  end 
-  
+   
   def to_xml(options = {})
     #RAILS_DEFAULT_LOGGER.debug("** Begin Dumping XML for #{self.class.name}:#{self.id}")    
     massaged_attributes = attributes.dup
@@ -55,22 +49,26 @@ class HyperactiveResource < ActiveResource::Base
     return false unless valid?
     before_save    
     successful = super
-    if successful          
-      after_save 
-    end
+    after_save if successful          
     successful
   end    
-  
-  # make sure we can valid? new record  
+    
+  # Saves the model
+  #
+  # Thiw will save remotely after making sure there are no local errors
+  # Throws RecordNotSaved if saving fails
+  def save!
+    save || raise(RecordNotSaved)
+  end 
+ 
+  # runs +validate+ and returns true if no errors were added otherwise false.
   def valid? 
     errors.clear
     validate 
     super 
   end
   
-  def new_record?
-    new?
-  end
+  alias :new_record? :new?
 
   def respond_to?(method, include_private = false)
     attribute_getter?(method) || attribute_setter?(method) || super
@@ -90,7 +88,9 @@ class HyperactiveResource < ActiveResource::Base
   # If the saving fails because of a connection or remote service error, an exception will be raised.  If saving 
   # fails because the resource is invalid then <tt>false</tt> will be returned. 
   #     
-  def update_attribute(name, value); update_attributes(name => value); end 
+  def update_attribute(name, value) 
+    update_attributes(name => value)
+  end 
  
   # Updates this resource withe all the attributes from the passed-in Hash and requests that 
   # the record be saved. 
@@ -131,23 +131,23 @@ class HyperactiveResource < ActiveResource::Base
   def update
     #RAILS_DEFAULT_LOGGER.debug("******** REST Call to CRMS: Updating #{self.class.name}:#{self.id}")
     #RAILS_DEFAULT_LOGGER.debug(caller[0..5].join("\n"))                             
-    response = connection.put(element_path(prefix_options), to_xml, self.class.headers)
-    save_nested
-    load_attributes_from_response(response)
-    merge_saved_nested_resources_into_attributes
-    response
+    connection.put(element_path(prefix_options), to_xml, self.class.headers) do |response|
+      save_nested
+      load_attributes_from_response(response)
+      merge_saved_nested_resources_into_attributes
+    end
   end
 
   # Create (i.e., save to the remote service) the new resource.
   def create
     #RAILS_DEFAULT_LOGGER.debug("******** REST Call to CRMS: Creating #{self.class.name}:#{self.id}")
     #RAILS_DEFAULT_LOGGER.debug(caller[0..5].join("\n"))
-    response = connection.post(collection_path, to_xml, self.class.headers)
-    self.id = id_from_response(response) 
-    save_nested
-    load_attributes_from_response(response)
-    merge_saved_nested_resources_into_attributes
-    response
+    connection.post(collection_path, to_xml, self.class.headers) do |response|
+      self.id = id_from_response(response) 
+      save_nested
+      load_attributes_from_response(response)
+      merge_saved_nested_resources_into_attributes
+    end
   end  
   
   ##These are just hooks for debugging
