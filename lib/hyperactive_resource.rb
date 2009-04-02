@@ -19,32 +19,23 @@ class HyperactiveResource < ActiveResource::Base
     attributes.update(new_attributes)
   end
    
-  # TODO: see if we can find a way to use "super" and merge the results of
-  # the associations
   def to_xml(options = {})
-    #RAILS_DEFAULT_LOGGER.debug("** Begin Dumping XML for #{self.class.name}:#{self.id}")    
     massaged_attributes = attributes.dup
     
-    #Massage patient.id into patient_id (for every belongs_to) and    
+    # Massage patient.id into patient_id (for every belongs_to)
     massaged_attributes.each do |key, value|
       if self.belong_tos.include? key.to_sym
-        #RAILS_DEFAULT_LOGGER.debug("**** Moving #{key}.id into #{key}_id")        
-        massaged_attributes["#{key}_id"] = value.id #TODO Should check respond_to and so on
+        massaged_attributes["#{key}_id"] = value.id
         massaged_attributes.delete(key)       
       elsif key.to_s =~ /^.*_ids$/
-        #RAILS_DEFAULT_LOGGER.warn("**** Deleting #{key}.id because we are using the non ids version")
         massaged_attributes.delete(key)        
       end
     end
     
-    #Skip the things in the skip list
-    massaged_attributes = massaged_attributes.reject do |key,value|
-      skip_to_xml_for.include? key.to_sym
-    end    
+    # Skip the things in the skip list
+    massaged_attributes.delete_if {|key,value| skip_to_xml_for.include? key.to_sym }
     
-    xml = massaged_attributes.to_xml({:root => self.class.element_name}.merge(options))
-    #RAILS_DEFAULT_LOGGER.debug("** End Dumping XML for #{self.class.name}:#{self.id}")
-    xml
+    massaged_attributes.to_xml({:root => self.class.element_name}.merge(options))
   end
     
   def save
