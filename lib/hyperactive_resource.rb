@@ -244,7 +244,7 @@ class HyperactiveResource < ActiveResource::Base
   def method_missing(name, *args)
     return super if attributes.keys.include? name.to_s         
     
-    puts "++++++++++++++ method_missing #{name}"
+    # DEBUG puts "++++++++++++++ method_missing #{name}"
     
     case name
     when *self.columns
@@ -351,7 +351,7 @@ class HyperactiveResource < ActiveResource::Base
   end
   
   def nested_has_one_getter_method_missing( name )
-    puts "****************** nested_has_one_getter_method_missing( #{name} )"
+    # puts "****************** nested_has_one_getter_method_missing( #{name} )"
     self.new? ? nil : 
       # call_setter( name, name.to_s.camelize.constantize.send(:find, :one, :from => "/#{self.class.name.underscore.pluralize}/#{self.id}/#{name}.xml" ) )
       call_setter( name, re_instantiate(BarksResource.send(:find, :one, :from => "/#{self.class.name.underscore.pluralize}/#{self.id}/#{name}.xml" ) ))
@@ -363,7 +363,7 @@ class HyperactiveResource < ActiveResource::Base
   
   #Convenience method used by the method_missing methods
   def call_setter( name, value )
-    puts "****************** call_setter( #{name}, #{value} )"
+    # puts "****************** call_setter( #{name}, #{value} )"
     self.send( "#{name}=", value )
   end
   
