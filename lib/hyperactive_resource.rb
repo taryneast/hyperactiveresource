@@ -7,6 +7,18 @@ class AbstractRecordError < StandardError; end
 class RecordNotSaved < AbstractRecordError; end
 
 class HyperactiveResource < ActiveResource::Base
+  # make validations work just like ActiveRecord by pulling them in directly
+  extend ActiveRecord::Validations::ClassMethods
+  # create callbacks for validate/validate_on_create/validate_on_update
+  # Note: pull them from ActiveRecord's list in case they decide to update
+  # the list...
+  include ActiveSupport::Callbacks
+  define_callbacks *ActiveRecord::Validations::VALIDATIONS
+  # Add the standard list of ActiveRecord callbacks (for good measure).
+  # Calling this here means we can override these with our own versions
+  # below.
+  define_callbacks *ActiveRecord::Base::CALLBACKS
+  
   # make sure attributes of ARES has indifferent_access
   def initialize(attributes = {})
     @attributes     = {}.with_indifferent_access
