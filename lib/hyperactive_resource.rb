@@ -149,7 +149,7 @@ class HyperactiveResource < ActiveResource::Base
   def update
     #RAILS_DEFAULT_LOGGER.debug("******** REST Call to CRMS: Updating #{self.class.name}:#{self.id}")
     #RAILS_DEFAULT_LOGGER.debug(caller[0..5].join("\n"))                             
-    connection.put(element_path(prefix_options), to_xml, self.class.headers) do |response|
+    connection.put(element_path(prefix_options), to_xml, self.class.headers).tap do |response|
       save_nested
       load_attributes_from_response(response)
       merge_saved_nested_resources_into_attributes
@@ -160,7 +160,7 @@ class HyperactiveResource < ActiveResource::Base
   def create
     #RAILS_DEFAULT_LOGGER.debug("******** REST Call to CRMS: Creating #{self.class.name}:#{self.id}")
     #RAILS_DEFAULT_LOGGER.debug(caller[0..5].join("\n"))
-    connection.post(collection_path, to_xml, self.class.headers) do |response|
+    connection.post(collection_path, to_xml, self.class.headers).tap do |response|
       self.id = id_from_response(response) 
       save_nested
       load_attributes_from_response(response)
