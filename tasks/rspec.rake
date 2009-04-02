@@ -4,7 +4,6 @@
 rspec_base = File.expand_path(File.dirname(__FILE__) + '/../../rspec/lib')
 $LOAD_PATH.unshift(rspec_base) if File.exist?(rspec_base)
 require 'spec/rake/spectask'
-require 'spec/translator'
 
 namespace :hyperactive_resource do
   desc "Run all specs for hyperactive resource"
