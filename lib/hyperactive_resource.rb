@@ -124,10 +124,19 @@ class HyperactiveResource < ActiveResource::Base
 
 
   # validates_uniqeuness_of has to pull data out of the remote webserver
-  # to test. For the moment - this isn't going to work, so it will just
-  # not work at all.
+  # to test, so it has to be rewritten for ARes-style stuff.
+  # Currently assumes that you know what you're doing - ie no check for
+  # whether the given model actually *has* the given attribute.
+  # Just checks if a record already exists with the given value for the
+  # given column.
   def self.validates_uniqueness_of(*attr_names)
-    raise "validates_uniqueness_of Not implemented yet"
+    configuration = {}
+    configuration.update(attr_names.extract_options!)
+
+    validates_each(attr_names,configuration) do |record, attr_name, value|    
+      matching_recs = self.find(:all, :conditions => {attr_name => value})
+      record.errors.add(attr_name, :taken, :default => configuration[:message], :value => value) if matching_recs.blank? || matching_recs.count > 0
+    end
   end
 
     
@@ -297,7 +306,7 @@ class HyperactiveResource < ActiveResource::Base
   end
   
   def id_from_response(response)
-    # response['Location'][/\/([^\/]*?)(\.\w+)?$/, 1]
+    # response['Location'][/\/([^\/]*?)(\.\w+)?$/, 1] if response['Location'] 
     Hash.from_xml(response.body).values[0]["id"]
   end            
   
