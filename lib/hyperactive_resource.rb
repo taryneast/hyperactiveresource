@@ -134,12 +134,19 @@ class HyperactiveResource < ActiveResource::Base
     configuration.update(attr_names.extract_options!)
 
     validates_each(attr_names,configuration) do |record, attr_name, value|    
-      matching_recs = self.find(:all, :conditions => {attr_name => value})
-      record.errors.add(attr_name, :taken, :default => configuration[:message], :value => value) if matching_recs.blank? || matching_recs.count > 0
+      # TODO: make the below work
+      #record.errors.add(attr_name, :taken, :default => configuration[:message], :value => value) if self.count(:conditions => {attr_name.to_s => value}) > 0
+      # Currently find just fetches *every* record and we then have to
+      # hand-filter it... :P
+      record.errors.add(attr_name, :taken, :default => configuration[:message], :value => value) if self.find(:all).any? {|rec| value == rec.send(attr_name) }
     end
   end
 
-    
+     
+  # Saves the model
+  #
+  # This will save remotely after making sure there are no local errors
+  # returns false if saving fails
   def save
     return false unless valid?
     before_save    
@@ -150,7 +157,7 @@ class HyperactiveResource < ActiveResource::Base
     
   # Saves the model
   #
-  # Thiw will save remotely after making sure there are no local errors
+  # This will save remotely after making sure there are no local errors
   # Throws RecordNotSaved if saving fails
   def save!
     save || raise(RecordNotSaved)
@@ -171,7 +178,7 @@ class HyperactiveResource < ActiveResource::Base
       validate_on_update
     end
 
-    # if we have local errors - skip out now before hitting the net
+    # we're valid if we found no errors
     errors.empty?
   end
   
