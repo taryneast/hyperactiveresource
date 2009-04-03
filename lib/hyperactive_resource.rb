@@ -163,9 +163,7 @@ class HyperactiveResource < ActiveResource::Base
     end
 
     # if we have local errors - skip out now before hitting the net
-    return false unless errors.empty?
-    
-    super 
+    errors.empty?
   end
   
   # Returns the Errors object that holds all information about attribute error messages.
