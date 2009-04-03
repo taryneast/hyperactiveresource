@@ -7,17 +7,89 @@ class AbstractRecordError < StandardError; end
 class RecordNotSaved < AbstractRecordError; end
 
 class HyperactiveResource < ActiveResource::Base
+  # Quick overloading of the ActiveRecord-style naming function for the
+  # model in error messages.  This will be updated when associations are
+  # complete
+  def self.human_name(options = {})
+    self.name.humanize
+  end
+  # Quick overloading of the ActvieRecord-style naming functions for
+  # attributes in error messages.
+  # This will be updated when associations are complete
+  def self.human_attribute_name(attribute_key_name, options = {})
+    attribute_key_name.humanize
+  end
+
+
+  # Active\Resource's errors object is only a random selection of
+  # ActiveRecord's error methods - and most of them are just copies of older
+  # versions (eg before they added il8n)
+  # So why not just inherit the attributes and add in the *only*
+  # ActiveResource method that actually differs?
+  class Errors < ActiveRecord::Errors
+    
+    def initialize(base) # :nodoc:
+      #p "initializing ActiveResource::Errors: methods available: #{methods.sort.inspect}"
+      @base, @errors = base, {}
+    end
+
+  # Edited from ActiveRecord as we don't yet fully support 
+  # associations
+    def generate_message(attribute, message = :invalid, options = {})
+
+      message, options[:default] = options[:default], message if options[:default].is_a?(Symbol)
+
+      defaults = [@base.class].map do |klass|
+        [ :"models.#{klass.name.underscore}.attributes.#{attribute}.#{message}", 
+          :"models.#{klass.name.underscore}.#{message}" ]
+      end
+      
+      defaults << options.delete(:default)
+      defaults = defaults.compact.flatten << :"messages.#{message}"
+
+      key = defaults.shift
+      value = @base.respond_to?(attribute) ? @base.send(attribute) : nil
+
+      options = { :default => defaults,
+        :model => @base.class.human_name,
+        :attribute => @base.class.human_attribute_name(attribute.to_s),
+        :value => value,
+        :scope => [:activerecord, :errors]
+      }.merge(options)
+
+      I18n.translate(key, options)
+    end
+
+    
+    # Grabs errors from the XML response.
+    def from_xml(xml)
+      clear
+      humanized_attributes = @base.attributes.keys.inject({}) { |h, attr_name| h.update(attr_name.humanize => attr_name) }
+      messages = Array.wrap(Hash.from_xml(xml)['errors']['error']) rescue []
+      messages.each do |message|
+        attr_message = humanized_attributes.keys.detect do |attr_name|
+          if message[0, attr_name.size + 1] == "#{attr_name} "
+            add humanized_attributes[attr_name], message[(attr_name.size + 1)..-1]
+          end
+        end
+        
+        add_to_base message if attr_message.nil?
+      end
+    end
+  end
+
+
   # make validations work just like ActiveRecord by pulling them in directly
   extend ActiveRecord::Validations::ClassMethods
   # create callbacks for validate/validate_on_create/validate_on_update
   # Note: pull them from ActiveRecord's list in case they decide to update
   # the list...
   include ActiveSupport::Callbacks
-  define_callbacks *ActiveRecord::Validations::VALIDATIONS
+  self.define_callbacks *ActiveRecord::Validations::VALIDATIONS
   # Add the standard list of ActiveRecord callbacks (for good measure).
   # Calling this here means we can override these with our own versions
   # below.
-  define_callbacks *ActiveRecord::Base::CALLBACKS
+  self.define_callbacks *ActiveRecord::Base::CALLBACKS
   
   # make sure attributes of ARES has indifferent_access
   def initialize(attributes = {})
@@ -49,6 +121,15 @@ class HyperactiveResource < ActiveResource::Base
     
     massaged_attributes.to_xml({:root => self.class.element_name}.merge(options))
   end
+
+
+  # validates_uniqeuness_of has to pull data out of the remote webserver
+  # to test. For the moment - this isn't going to work, so it will just
+  # not work at all.
+  def self.validates_uniqueness_of(*attr_names)
+    raise "validates_uniqueness_of Not implemented yet"
+  end
+
     
   def save
     return false unless valid?
@@ -69,10 +150,29 @@ class HyperactiveResource < ActiveResource::Base
   # runs +validate+ and returns true if no errors were added otherwise false.
   def valid? 
     errors.clear
-    validate 
+
+    run_callbacks(:validate)
+    validate
+
+    if new_record?
+      run_callbacks(:validate_on_create)
+      validate_on_create
+    else
+      run_callbacks(:validate_on_update)
+      validate_on_update
+    end
+
+    # if we have local errors - skip out now before hitting the net
+    return false unless errors.empty?
+    
     super 
   end
   
+  # Returns the Errors object that holds all information about attribute error messages.
+  def errors
+    @errors ||= Errors.new(self)
+  end
+
   alias :new_record? :new?
 
   def respond_to?(method, include_private = false)
@@ -217,7 +317,13 @@ class HyperactiveResource < ActiveResource::Base
   def validate
     before_validate
   end
-    
+
+  # empty functions to be overloaded int he class if necessary.
+  def validate_on_update
+  end
+  def validate_on_create
+  end
+   
   def before_save_or_validate
     #Do nothing
   end     
