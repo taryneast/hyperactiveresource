@@ -214,7 +214,8 @@ class HyperactiveResource < ActiveResource::Base
   #  +save+
   #  Thus it will throw an exception if the save fails.
   def update_attributes!(attributes)
-    load(attributes) && save! 
+    load(attributes) || raise(RecordNotSaved)
+    save! 
   end
   
   protected  
