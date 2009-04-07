@@ -20,6 +20,13 @@ class HyperactiveResource < ActiveResource::Base
     attribute_key_name.humanize
   end
 
+  # load the files here so we can test the code independantly of a rails
+  # setup.
+  require "active_record"
+  # need to use load because require will kill active_record's own require
+  # of the validatios module
+  load "active_record/validations.rb"
+
 
   # Active\Resource's errors object is only a random selection of
   # ActiveRecord's error methods - and most of them are just copies of older

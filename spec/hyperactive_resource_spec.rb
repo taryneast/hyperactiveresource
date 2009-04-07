@@ -1,4 +1,5 @@
 require File.dirname(__FILE__) + '/spec_helper'
+require "active_record"
 require "active_resource"
 require "active_resource/http_mock"
 require 'hyperactive_resource'
