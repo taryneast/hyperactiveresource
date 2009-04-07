@@ -148,7 +148,6 @@ class HyperactiveResource < ActiveResource::Base
   # This will save remotely after making sure there are no local errors
   # returns false if saving fails
   def save
-    return false unless valid?
     before_save    
     successful = super
     after_save if successful          
@@ -234,7 +233,11 @@ class HyperactiveResource < ActiveResource::Base
     save! 
   end
   
-  protected  
+
+
+
+
+  protected   ##########################################################
 
   # used when somebody overloads the "attribute=" method and then wants to
   # save the value into attributes
@@ -243,6 +246,7 @@ class HyperactiveResource < ActiveResource::Base
   end
   
   def save_nested
+    return if nested_resources.blank?
     @saved_nested_resources = {}
     nested_resources.each do |nested_resource_name|
       resources = attributes[nested_resource_name.to_s.pluralize] 
@@ -269,6 +273,7 @@ class HyperactiveResource < ActiveResource::Base
       load_attributes_from_response(response)
       merge_saved_nested_resources_into_attributes
     end
+    self
   end
 
   # Create (i.e., save to the remote service) the new resource.
@@ -281,6 +286,7 @@ class HyperactiveResource < ActiveResource::Base
       load_attributes_from_response(response)
       merge_saved_nested_resources_into_attributes
     end
+    self
   end  
   
   ##These are just hooks for debugging
@@ -303,6 +309,7 @@ class HyperactiveResource < ActiveResource::Base
 #  end
   
   def merge_saved_nested_resources_into_attributes
+    return if nested_resources.blank?
     @saved_nested_resources.each_key do |nested_resource_name|
       attr_name = nested_resource_name.to_s.pluralize
       resource_list_before_merge = attributes[attr_name] || []
@@ -558,7 +565,7 @@ class HyperactiveResource < ActiveResource::Base
       value.map { |attrs| resource.new(attrs) }
     end
   end
-   	
+    
   #Called by overriden load
   def convert_to_i_if_id_field( key, value )
     #This might be an id of an association, and if they are passing in a string it should be to_ied                        
@@ -611,5 +618,5 @@ class HyperactiveResource < ActiveResource::Base
   def self.all
     self.find(:all)
   end
-  
+    
 end
