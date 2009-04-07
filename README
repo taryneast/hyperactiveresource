@@ -1,20 +1,28 @@
 HyperactiveResource
 ===================
 
-v0.1
+v0.2
 
 Many have said that ActiveResource is not really "complete". On the surface,
-this means that some features that are documented aren't implemented. Digging a
-little deeper, we find that some features that should exist don't.
+this means that many standard ActiveRecord features are not implemented.
+
+This makes the concept of swapping ActiveRecord for ActiveResource immensely
+difficult (and cludgy, hand-built, buggy etc etc)
 
 Arguably, a "complete" ActiveResource would behave like ActiveRecord or, as the
 rdoc for ActiveResource states "very similarly to Active Record".
 
-Hyperactive Resource is MDL's extension to ActiveResource::Base written to
-support our Patient Registry and goes a long way towards the goal of an
-ActiveResource that behaves like ActiveRecord.
+Hyperactive Resource is an extension to ActiveResource::Base and goes a long
+way towards the goal of an ActiveResource that behaves like ActiveRecord.
+It will slowly be updated with all the standard features of ActiveRecord
+until (someday) it can be used almost interchangeably.
 
-Features
+This code could indeed go directly into ActiveResource, but, given some fo
+the implementations) that would put a dependancy between the two which may
+be resolved once Rails 3.0 comes out. There's nothing stopping this code
+from being integrated back into ARes at a later date :)
+
+Features that Hyperactive Resource has added:
  * Client side validations
  * Hooks for before_validate, before_save
  * Dynamic finders: find_by_X
@@ -37,18 +45,25 @@ Example
  1. Install the plugin via:
 
     cd path/to/rails_root/vendor/plugins
-    git clone git://github.com/lukegalea/hyperactiveresource.git
+    git clone	git://github.com/taryneast/hyperactiveresource.git
 
  2. Create a HyperactiveResource where you would normally use ActiveResource
     and define the meta-data/associations that drive the dynamic magic:
 
     class Address < HyperactiveResource
-      self.columns = [ :street_address, :city, :zipcode, :home_phone_number ]
+      self.columns = [ :street_address, :city, :postcode, :phone, :email]
       self.belong_tos = [ :country, :state ]
       self.has_manys = [ :people ]
     end
 
  3. Enjoy the magic
+
+    class Address < HyperactiveResource
+      ...
+      validates_presence_of :postcode, :phone
+      validates_uniqueness_of :email
+    end
+
 
     address = Address.new
     address.country # nil instead of method_missing
@@ -60,7 +75,9 @@ Example
 TODOs
 =====
 
-1) ActiveRecord style validations eg: validates_presence_of
+0) Testing!
+
+1) MyModel.count
 
 2) ability to use ActiveRecord-style nomenclature for associations eg:
     has_many :x, :y, :z
@@ -70,11 +87,30 @@ TODOs
 3) proper callbacks for before/after save/create/validate etc rather than
   bodgied-up functions called directly in the code
 
+4) conditional finders (eg MyModel.find(:all, :conditions => {:state =>
+'active'}
+
+5) MyModel.with_scope
+
+6) find(:include => ...)
+
+7) attr_protected/attr_accessible
+
+8) MyModel.calculate/avergae/minimum/maximum etc
+
 
 N) merge of this stuff back into the real ActiveResource
 
 
-Copyright
+Copyright and Authorship
 =========
+
+Author: Taryn East
+Copyright (c) 2009 White Label Dating
+http://whitelabeldating.com/
+
+Based on Work Done by Medical Decision Logic
+
+Original copyright:
 Copyright (c) 2008 Medical Decision Logic
 Released under the MIT license (see attached file)
