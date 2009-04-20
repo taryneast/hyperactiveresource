@@ -111,6 +111,11 @@ class HyperactiveResource < ActiveResource::Base
   end
    
   def to_xml(options = {})
+    # fix for rails bug 2521 (auto dasherizing when no field passed in
+    [:dasherize, :camelize].each do |f|
+      options[f] = (options.has_key?(f) && options[f] == true)
+    end
+
     massaged_attributes = attributes.dup
     
     # Massage patient.id into patient_id (for every belongs_to)
