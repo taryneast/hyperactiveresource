@@ -153,7 +153,7 @@ class HyperactiveResource < ActiveResource::Base
         # Currently find just fetches *every* record and we then have to
         # hand-filter it... :P
 
-        match_set = self.find(:all, :conditions => {the_attr => value})
+        match_set = self.find(:all, :conditions => { attr_name => value})
         # arrayify if we returned a single item
         match_set = [match_set] unless match_set.respond_to?(:[])
         match_set.compact!
