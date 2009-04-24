@@ -411,14 +411,10 @@ class HyperactiveResource < ActiveResource::Base
         return belong_to_getter_method_missing(name)
       when *self.belong_to_ids
         return belong_to_id_getter_method_missing(name)
-      when *self.nested_has_manys
-        return nested_has_many_getter_method_missing(name)
       when *self.has_manys
         return has_many_getter_method_missing(name)
       when *self.has_many_ids
         return has_many_ids_getter_method_missing(name)
-      when *self.nested_has_ones
-        return nested_has_one_getter_method_missing(name)      
       when *self.has_ones
         return has_one_getter_method_missing(name)      
       end                                     
@@ -485,14 +481,6 @@ class HyperactiveResource < ActiveResource::Base
         call_setter(name, associated_models) #return
       end
     end
-
-    #Getter for a belong_to relationship checks if the _id exists and dynamically finds the object
-    def nested_has_many_getter_method_missing( name )
-      self.new? ? [] : 
-        # call_setter(name, name.to_s.singularize.camelize.constantize.send(:find, :all, :from => "/#{self.class.name.underscore.pluralize}/#{self.id}/#{name}.xml" ) )
-        call_setter(name, BarksResource.send(:find, :all, :from => "/#{self.class.name.underscore.pluralize}/#{self.id}/#{name}.xml" ).collect { |br| re_instantiate(br) } )
-
-    end
     
     def has_many_ids_getter_method_missing( name )
       association_name = remove_id(name).pluralize #(residency_ids => residencies)
@@ -507,18 +495,7 @@ class HyperactiveResource < ActiveResource::Base
       self.new? ? nil : 
         call_setter( name, name.to_s.camelize.constantize.send("find_by_#{self.class.name.underscore}_id", self.id) )
     end
-    
-    def nested_has_one_getter_method_missing( name )
-      # puts "****************** nested_has_one_getter_method_missing( #{name} )"
-      self.new? ? nil : 
-        # call_setter( name, name.to_s.camelize.constantize.send(:find, :one, :from => "/#{self.class.name.underscore.pluralize}/#{self.id}/#{name}.xml" ) )
-        call_setter( name, re_instantiate(BarksResource.send(:find, :one, :from => "/#{self.class.name.underscore.pluralize}/#{self.id}/#{name}.xml" ) ))
-    end
 
-    def re_instantiate(object)
-      object.ruby_class.constantize.new(object.attributes)
-    end
-    
     #Convenience method used by the method_missing methods
     def call_setter( name, value )
       # puts "****************** call_setter( #{name}, #{value} )"
