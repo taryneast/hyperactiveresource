@@ -204,9 +204,9 @@ class HyperactiveResource < ActiveResource::Base
   #
   # This will save remotely after making sure there are no local errors
   # returns false if saving fails
-  def save
+  def save(perform_validations = true)
     before_save    
-    successful = super
+    successful = (perform_validations ? super() : save_without_validation)
     after_save if successful          
     successful
   end    
