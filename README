@@ -23,10 +23,11 @@ be resolved once Rails 3.0 comes out. There's nothing stopping this code
 from being integrated back into ARes at a later date :)
 
 Features that Hyperactive Resource has added:
- * Client side validations
+ * Client side validations (validates_uniqueness_of is still experimental!)
  * Hooks for before_validate, before_save
  * Dynamic finders: find_by_X
  * save!
+ * no explosion for delete_all/destroy_all on a 404
  * Awareness of associations between resources: belongs_to, has_many, has_one & columns
    * Patient.new.name returns nil instead of MethodMissing
    * Patient.new.races returns [] instead of MethodMissing
@@ -51,6 +52,7 @@ Example
     and define the meta-data/associations that drive the dynamic magic:
 
     class Address < HyperactiveResource
+      self.site = 'http://localhost:3001/'
       self.columns = [ :street_address, :city, :postcode, :phone, :email]
       self.belong_tos = [ :country, :state ]
       self.has_manys = [ :people ]
@@ -69,6 +71,9 @@ Example
     address.country # nil instead of method_missing
     address.country_id = 5
     address.country #Returns Country.find(5)
+
+    bad_address = Address.create()
+    bad_address.errors.full_messages.inspect # => "[\"Postcode can't be blank\", \"Phone can't be blank\"]"
   etc..
 
 
