@@ -170,6 +170,35 @@ class HyperactiveResource < ActiveResource::Base
     end
   end
 
+
+  # currently, ActiveResource doesn't handle a 404 on a destroy_all very
+  # nicely... 
+  # Returns true if it destroyed them all successfully.
+  # Returns nil if it didn't find any.
+  #
+  # Note: make sure the remote API does not just redirect on delete (as per
+  # somne standard Rails pre-generated code)... make sure it handles the xml
+  # format nicely sending either a 200 or a 404 where appropriate
+  def self.destroy_all(conditions = nil)
+    begin
+      matches = find(:all, :conditions => conditions)
+      unless matches.blank?
+        matches = [matches] unless matches.respond_to?(:[]) # arrayify
+        matches.each { |object| object.destroy  }
+      end
+    rescue ActiveResource::ResourceNotFound
+      # we want to do nothing here... basically it just found nothing
+      # matching the given conditions
+      return nil
+    end
+    true
+  end
+  # unlike ActiveRecord... there's no easy way to just delete without
+  # instantiating, so just alias the above.
+  def self.delete_all(conds = nil)
+    self.destroy_all(conds)
+  end
+
      
   # Saves the model
   #
