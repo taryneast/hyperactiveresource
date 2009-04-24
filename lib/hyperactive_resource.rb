@@ -146,11 +146,27 @@ class HyperactiveResource < ActiveResource::Base
     configuration.update(attr_names.extract_options!)
 
     validates_each(attr_names,configuration) do |record, attr_name, value|    
-      # TODO: make the below work
-      #record.errors.add(attr_name, :taken, :default => configuration[:message], :value => value) if self.count(:conditions => {attr_name.to_s => value}) > 0
-      # Currently find just fetches *every* record and we then have to
-      # hand-filter it... :P
-      record.errors.add(attr_name, :taken, :default => configuration[:message], :value => value) if self.find(:all).any? {|rec| value == rec.send(attr_name) }
+      # skip if we allow nil and value is nil
+      if (!configuration.has_key?(:allow_nil) || (configuration[:allow_nil] && !value.blank?))
+        # TODO: make the below work
+        #record.errors.add(attr_name, :taken, :default => configuration[:message], :value => value) if self.count(:conditions => {attr_name.to_s => value}) > 0
+        # Currently find just fetches *every* record and we then have to
+        # hand-filter it... :P
+
+        match_set = self.find(:all, :conditions => {the_attr => value})
+        # arrayify if we returned a single item
+        match_set = [match_set] unless match_set.respond_to?(:[])
+        match_set.compact!
+        if !match_set.blank? # only bother if we found something
+          # there are two cases where there's no error.
+          # Firstly, if we found none matching at all
+          # Secondly, if we found one - but it's really the current record...
+          #   which will only occur if the ids match
+          # So we need to count the number of records returned that have the
+          # attribute we've passed in... but don't have our id.
+          record.errors.add the_attr, "has already been taken. Please choose another" unless 0 == match_set.count {|rec| (value == rec.send(attr_name)) && (record.id && rec.id != record.id) }
+        end
+      end
     end
   end
 
