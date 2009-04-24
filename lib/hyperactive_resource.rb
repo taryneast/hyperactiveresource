@@ -381,18 +381,24 @@ class HyperactiveResource < ActiveResource::Base
     self.columns = []
     self.skip_to_xml_for = []
 
-    #These don't work!
-  #  def self.belongs_to( name )
-  #    self.belong_tos << name
-  #  end
-  #    
-  #  def self.has_many( name )
-  #    self.has_manys << name
-  #  end
-  #  
-  #  def self.column( name )
-  #    self.columns << name
-  #  end 
+    #These possibly don't work! :)
+    def self.belongs_to( name )
+      raise ArgumentError if name.blank?
+      name = [name] unless name.respond_to?(:[]) # arrayify
+      self.belong_tos << name
+    end
+      
+    def self.has_many( name )
+      raise ArgumentError if name.blank?
+      name = [name] unless name.respond_to?(:[]) # arrayify
+     self.has_manys << name
+    end
+    
+    def self.column( name )
+      raise ArgumentError if name.blank?
+      name = [name] unless name.respond_to?(:[]) # arrayify
+      self.columns << name
+    end 
         
   #  When you call any of these dynamically inferred methods 
   #  the first call sets it so it's no longer dynamic for subsequent calls
