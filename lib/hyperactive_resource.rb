@@ -631,10 +631,6 @@ class HyperactiveResource < ActiveResource::Base
     def attribute_setter?(method)
       columns.include?(method.to_s.gsub(/=$/, '').to_sym)
     end
-    
-    def self.find_by( all, field, *args )
-      find( all.nil? ? :first : :all, :params => { field => args[0] } )      
-    end
       
 
   
