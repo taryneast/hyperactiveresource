@@ -637,6 +637,7 @@ class HyperactiveResource < ActiveResource::Base
     end
       
 
+  
     # add dynamic finders.
     # This allows:
     #  User.find_all_by_email('joe@bloggs.com')
@@ -659,7 +660,7 @@ class HyperactiveResource < ActiveResource::Base
         when 'all_by' 
           finder_kind = :all
         end
-        find_multiplex( finder_kind, field_name, *args )        
+        find( finder_kind, :params => { field_name => args } )        
       else
         super
       end
