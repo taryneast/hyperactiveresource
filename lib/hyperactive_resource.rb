@@ -636,27 +636,46 @@ class HyperactiveResource < ActiveResource::Base
       find( all.nil? ? :first : :all, :params => { field => args[0] } )      
     end
       
-    FINDER_REGEXP = /^find_(?:(all)_?)?by_([a-zA-Z0-9_]+)$/ 
+
+    # add dynamic finders.
+    # This allows:
+    #  User.find_all_by_email('joe@bloggs.com')
+    #   => returns all users with the matching parameter
+    #  User.find_by(:email, 'joe@bloggs.com')
+    #   => returns the first matching user
+    #  User.find_last_by(:email, 'joe@bloggs.com')
+    #   => same as above, but returns the last one. (note - because we don't
+    #   "sort" yet - this will fetch all of them and then return the last in
+    #   the array.
+    FINDER_REGEXP = /^find_(all_by|last_by|by)_([_a-zA-Z]\w*)$/
 
     def self.method_missing( symbol, *args )
       if symbol.to_s =~ FINDER_REGEXP 
-        all, field_name = symbol.to_s.scan(FINDER_REGEXP).first #The ^ and $ mean only one thing will ever match this expression so use the first
-        find_by( all, field_name, *args )        
+        finder_type, field_name = symbol.to_s.scan(FINDER_REGEXP).first #The ^ and $ mean only one thing will ever match this expression so use the first
+        finder_kind = :first # matches when 'find_by' or 'find_first_by'
+        case finder_type 
+        when 'last_by' 
+          finder_kind = :last
+        when 'all_by' 
+          finder_kind = :all
+        end
+        find_multiplex( finder_kind, field_name, *args )        
       else
         super
       end
     end
-    
-    def self.first
-      self.find(:first)
+   
+    # convenience methods as per ActiveRecord
+    def self.first(*args)
+      self.find(:first, args)
     end
 
-    def self.last
-      self.find(:last)
+    def self.last(*args)
+      self.find(:last, args)
     end
 
-    def self.all
-      self.find(:all)
+    def self.all(*args)
+      self.find(:all, args)
     end
     
 end
