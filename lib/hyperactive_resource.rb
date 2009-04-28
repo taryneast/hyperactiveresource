@@ -111,27 +111,12 @@ class HyperactiveResource < ActiveResource::Base
   end
    
   def to_xml(options = {})
-    # fix for rails bug 2521 (auto dasherizing when no field passed in
+    # fix for rails bug 2521 (auto dasherizing when no field passed in)
+    # Remove this when Rails has been fixed.
     [:dasherize, :camelize].each do |f|
       options[f] = (options.has_key?(f) && options[f] == true)
     end
-
-    massaged_attributes = attributes.dup
-    
-    # Massage patient.id into patient_id (for every belongs_to)
-    massaged_attributes.each do |key, value|
-      if self.belong_tos.include? key.to_sym
-        massaged_attributes["#{key}_id"] = value.id unless value.blank?
-        massaged_attributes.delete(key)       
-      elsif key.to_s =~ /^.*_ids$/
-        massaged_attributes.delete(key)        
-      end
-    end
-    
-    # Skip the things in the skip list
-    massaged_attributes.delete_if {|key,value| skip_to_xml_for.include? key.to_sym }
-    
-    massaged_attributes.to_xml({:root => self.class.element_name}.merge(options))
+    super(options)
   end
 
 
@@ -301,6 +286,37 @@ class HyperactiveResource < ActiveResource::Base
     def write_attribute(key, value)
       attributes[key.to_s] = value
     end
+
+
+    # overwrite the encoding function to massage our associations attributes
+    # into a form that can be encoded nicely.
+    def encode(opts = {})
+      # don't bother unless we have some
+      return super(opts) if self.belong_tos.blank?
+
+      massaged_attributes = attributes.dup
+      
+      # Massage patient.id into patient_id (for every belongs_to)
+      massaged_attributes.each do |key, value|
+        if self.belong_tos.include? key.to_sym
+          massaged_attributes["#{key}_id"] = value.id unless value.blank?
+          massaged_attributes.delete(key)       
+        elsif key.to_s =~ /^.*_ids$/
+          massaged_attributes.delete(key)        
+        end
+      end
+      
+      # Skip the things in the skip list
+      massaged_attributes.delete_if {|key,value| skip_to_xml_for.include? key.to_sym }
+      # the following is a copy of ARes's encode - but with our new attributes
+      # It may need to be updated if we want to stay in line with ARes. :P
+      case self.class.format
+        when ActiveResource::Formats[:xml]
+          self.class.format.encode(massaged_attributes, {:root => self.class.element_name}.merge(options))
+        else
+          self.class.format.encode(massaged_attributes, options)
+      end
+    end
     
     def save_nested
       return if nested_resources.blank?
@@ -325,7 +341,7 @@ class HyperactiveResource < ActiveResource::Base
     def update
       #RAILS_DEFAULT_LOGGER.debug("******** REST Call to CRMS: Updating #{self.class.name}:#{self.id}")
       #RAILS_DEFAULT_LOGGER.debug(caller[0..5].join("\n"))                             
-      connection.put(element_path(prefix_options), to_xml, self.class.headers).tap do |response|
+      connection.put(element_path(prefix_options), encode, self.class.headers).tap do |response|
         save_nested
         load_attributes_from_response(response)
         merge_saved_nested_resources_into_attributes
@@ -337,7 +353,7 @@ class HyperactiveResource < ActiveResource::Base
     def create
       #RAILS_DEFAULT_LOGGER.debug("******** REST Call to CRMS: Creating #{self.class.name}:#{self.id}")
       #RAILS_DEFAULT_LOGGER.debug(caller[0..5].join("\n"))
-      connection.post(collection_path, to_xml, self.class.headers).tap do |response|
+      connection.post(collection_path, encode, self.class.headers).tap do |response|
         self.id = id_from_response(response) 
         save_nested
         load_attributes_from_response(response)
@@ -690,9 +706,13 @@ class HyperactiveResource < ActiveResource::Base
     # count on a local array and you're probably better off doing that in
     # your own code.
     def self.count(args = {})
-      # The long way of doing it.... uncomment this if you desperately need
-      # this implemented (eg other code assumes it exists)
-      self.find(:all, args).length
+      # try the neato way assuming a "count_widgets" collection path
+      begin
+        self.find(:all, args).length
+      rescue ResourceNotFound
+        # if it fails - fall back on the long way
+        self.find(:all, args).length
+      end
     end
 
     
