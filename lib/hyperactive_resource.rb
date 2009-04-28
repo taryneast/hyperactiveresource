@@ -664,31 +664,31 @@ class HyperactiveResource < ActiveResource::Base
 
     def self.method_missing( symbol, *args )
       if symbol.to_s =~ FINDER_REGEXP 
-        finder_type, field_name = symbol.to_s.scan(FINDER_REGEXP).first #The ^ and $ mean only one thing will ever match this expression so use the first
-        finder_kind = :first # matches when 'find_by' or 'find_first_by'
-        case finder_type 
+        finder_text, field_name = symbol.to_s.scan(FINDER_REGEXP).first #The ^ and $ mean only one thing will ever match this expression so use the first
+        scope = :first # matches when 'find_by' or 'find_first_by'
+        case scope 
         when 'last_by' 
-          finder_kind = :last
+          scope = :last
         when 'all_by' 
-          finder_kind = :all
+          scope = :all
         end
-        find( finder_kind, :params => { field_name => args } )        
+        find( scope, :params => { field_name => args } )        
       else
-        super
+        super( symbol, args )
       end
     end
    
     # convenience methods as per ActiveRecord
     def self.first(*args)
-      self.find(:first, args)
+      self.find(:first, *args)
     end
 
     def self.last(*args)
-      self.find(:last, args)
+      self.find(:last, *args)
     end
 
     def self.all(*args)
-      self.find(:all, args)
+      self.find(:all, *args)
     end
 
 
