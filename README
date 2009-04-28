@@ -25,8 +25,9 @@ from being integrated back into ARes at a later date :)
 Features that Hyperactive Resource has added:
  * Client side validations (validates_uniqueness_of is still experimental!)
  * Hooks for before_validate, before_save
- * Dynamic finders: find_by_X
+ * Dynamic finders: find_by_X find_all_by_X, find_first_by_X, find_last_by_X
  * save!
+ * ModelName.count (still experimental) - with optional finder-args
  * no explosion for delete_all/destroy_all on a 404
  * Awareness of associations between resources: belongs_to, has_many, has_one & columns
    * Patient.new.name returns nil instead of MethodMissing
@@ -66,14 +67,30 @@ Example
       validates_uniqueness_of :email
     end
 
+    Address.delete_all # should not raise a 404
+    Address.count # returns 0
 
-    address = Address.new
+    bad_address = Address.new
+    bad_address.save! # raises ActiveResource::RecordNotSaved
+
+    Address.count # returns 0
+
+    address = Address.new(:postcode => '12345', :phone => '555 1234')
     address.country # nil instead of method_missing
     address.country_id = 5
-    address.country #Returns Country.find(5)
+    address.country  # Returns Country.find(5)
+    address.save!    # returns true
+
+    Address.first.phone # should return '555 1234'
+
+    Address.count # returns 1
+    Address.count(:phone => '555 9876') # returns 0
 
     bad_address = Address.create()
     bad_address.errors.full_messages.inspect # => "[\"Postcode can't be blank\", \"Phone can't be blank\"]"
+
+
+    Address.count(:phone => '555 1234') # returns 1
   etc..
 
 
