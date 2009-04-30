@@ -26,8 +26,11 @@ Features that Hyperactive Resource has added:
  * Client side validations (validates_uniqueness_of is still experimental!)
  * Hooks for before_validate, before_save
  * Dynamic finders: find_by_X find_all_by_X, find_first_by_X, find_last_by_X
- * save!
+ * save! / update_attributes!   (raises HyperactiveResource::ResourceNotSaved on failure)
  * ModelName.count (still experimental) - with optional finder-args
+    - override the default counter_path with your own (see example below)
+ * updated collection_path that allows suffix_options as well as
+   prefix_options = allows us to generate Rails-style named routes
  * no explosion for delete_all/destroy_all on a 404
  * Awareness of associations between resources: belongs_to, has_many, has_one & columns
    * Patient.new.name returns nil instead of MethodMissing
@@ -57,15 +60,13 @@ Example
       self.columns = [ :street_address, :city, :postcode, :phone, :email]
       self.belong_tos = [ :country, :state ]
       self.has_manys = [ :people ]
-    end
+      self.counter_path = 'address_count.xml' # override default count path
 
- 3. Enjoy the magic
-
-    class Address < HyperactiveResource
-      ...
       validates_presence_of :postcode, :phone
       validates_uniqueness_of :email
     end
+
+ 3. Enjoy the magic
 
     Address.delete_all # should not raise a 404
     Address.count # returns 0
@@ -93,32 +94,30 @@ Example
     Address.count(:phone => '555 1234') # returns 1
   etc..
 
-
 TODOs
 =====
 
 0) Testing!
 
-1) MyModel.count
-
-2) ability to use ActiveRecord-style nomenclature for associations eg:
+1) ability to use ActiveRecord-style nomenclature for associations eg:
     has_many :x, :y, :z
   instead of: 
-    has_manys [:x, :y, :z]
+    self.has_manys = [:x, :y, :z]
 
-3) proper callbacks for before/after save/create/validate etc rather than
+2) proper callbacks for before/after save/create/validate etc rather than
   bodgied-up functions called directly in the code
 
-4) conditional finders (eg MyModel.find(:all, :conditions => {:state =>
-'active'}
+3) conditional finders (eg MyModel.find(:all, :conditions => {:state =>
+'active'} (partly works, but experimental - depends on your API accepting
+params)
 
-5) MyModel.with_scope
+4) MyModel.with_scope
 
-6) find(:include => ...)
+5) find(:include => ...)
 
-7) attr_protected/attr_accessible
+6) attr_protected/attr_accessible
 
-8) MyModel.calculate/avergae/minimum/maximum etc
+7) MyModel.calculate/average/minimum/maximum etc
 
 
 N) merge of this stuff back into the real ActiveResource

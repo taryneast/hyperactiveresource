@@ -4,7 +4,7 @@ class AbstractRecordError < StandardError; end
 
 # Raised by ActiveRecord::Base.save! and ActiveRecord::Base.create! methods when record cannot be
 # saved because record is invalid.
-class RecordNotSaved < AbstractRecordError; end
+class ResourceNotSaved < AbstractRecordError; end
 
 class HyperactiveResource < ActiveResource::Base
   # Quick overloading of the ActiveRecord-style naming function for the
@@ -200,8 +200,8 @@ class HyperactiveResource < ActiveResource::Base
   #
   # This will save remotely after making sure there are no local errors
   # Throws RecordNotSaved if saving fails
-  def save!
-    save || raise(RecordNotSaved)
+  def save!(perform_validations = true)
+    save(perform_validations) || raise(ResourceNotSaved)
   end 
  
   # runs +validate+ and returns true if no errors were added otherwise false.
@@ -271,7 +271,7 @@ class HyperactiveResource < ActiveResource::Base
   #  +save+
   #  Thus it will throw an exception if the save fails.
   def update_attributes!(attributes)
-    load(attributes) || raise(RecordNotSaved)
+    load(attributes) || raise(ResourceNotSaved)
     save! 
   end
   
@@ -339,8 +339,6 @@ class HyperactiveResource < ActiveResource::Base
     
     # Update the resource on the remote service.
     def update
-      #RAILS_DEFAULT_LOGGER.debug("******** REST Call to CRMS: Updating #{self.class.name}:#{self.id}")
-      #RAILS_DEFAULT_LOGGER.debug(caller[0..5].join("\n"))                             
       connection.put(element_path(prefix_options), encode, self.class.headers).tap do |response|
         save_nested
         load_attributes_from_response(response)
@@ -351,8 +349,6 @@ class HyperactiveResource < ActiveResource::Base
 
     # Create (i.e., save to the remote service) the new resource.
     def create
-      #RAILS_DEFAULT_LOGGER.debug("******** REST Call to CRMS: Creating #{self.class.name}:#{self.id}")
-      #RAILS_DEFAULT_LOGGER.debug(caller[0..5].join("\n"))
       connection.post(collection_path, encode, self.class.headers).tap do |response|
         self.id = id_from_response(response) 
         save_nested
@@ -361,25 +357,6 @@ class HyperactiveResource < ActiveResource::Base
       end
       self
     end  
-    
-    ##These are just hooks for debugging
-  #  def self.find_every(options)
-  #    RAILS_DEFAULT_LOGGER.debug("******** REST Call to CRMS: Getting #{self.name}")
-  #    RAILS_DEFAULT_LOGGER.debug(caller[0..5].join("\n"))
-  #    super
-  #  end
-  #        
-  #  def self.find_one(options)
-  #    RAILS_DEFAULT_LOGGER.debug("******** REST Call to CRMS: Getting #{self.name}")
-  #    RAILS_DEFAULT_LOGGER.debug(caller[0..5].join("\n"))
-  #    super
-  #  end
-  #
-  #  def self.find_single(scope, options)
-  #    RAILS_DEFAULT_LOGGER.debug("******** REST Call to CRMS: Getting #{self.name}")
-  #    RAILS_DEFAULT_LOGGER.debug(caller[0..5].join("\n"))
-  #    super
-  #  end
     
     def merge_saved_nested_resources_into_attributes
       return if nested_resources.blank?
@@ -468,8 +445,6 @@ class HyperactiveResource < ActiveResource::Base
   #  But future changes aren't kept in sync (like ActiveRecord.. mostly)
     def method_missing(name, *args)
       return super if attributes.keys.include? name.to_s         
-      
-      # DEBUG puts "++++++++++++++ method_missing #{name}"
       
       case name
       when *self.columns
