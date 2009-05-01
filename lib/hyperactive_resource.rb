@@ -654,16 +654,16 @@ class HyperactiveResource < ActiveResource::Base
     end
    
     # convenience methods as per ActiveRecord
-    def self.first(*args)
-      self.find(:first, *args)
+    def self.first(args = {})
+      self.find(:first, args)
     end
 
-    def self.last(*args)
-      self.find(:last, *args)
+    def self.last(args = {})
+      self.find(:last, args)
     end
 
-    def self.all(*args)
-      self.find(:all, *args)
+    def self.all(args = {})
+      self.find(:all, args)
     end
 
 
