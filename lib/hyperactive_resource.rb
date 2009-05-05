@@ -312,9 +312,9 @@ class HyperactiveResource < ActiveResource::Base
       # It may need to be updated if we want to stay in line with ARes. :P
       case self.class.format
         when ActiveResource::Formats[:xml]
-          self.class.format.encode(massaged_attributes, {:root => self.class.element_name}.merge(options))
+          self.class.format.encode(massaged_attributes, {:root => self.class.element_name}.merge(opts))
         else
-          self.class.format.encode(massaged_attributes, options)
+          self.class.format.encode(massaged_attributes, opts)
       end
     end
     
