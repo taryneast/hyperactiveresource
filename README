@@ -26,6 +26,7 @@ Features that Hyperactive Resource has added:
  * Client side validations (validates_uniqueness_of is still experimental!)
  * Hooks for before_validate, before_save
  * Dynamic finders: find_by_X find_all_by_X, find_first_by_X, find_last_by_X
+     (relies on your API accepting filter fields)
  * save! / update_attributes!   (raises HyperactiveResource::ResourceNotSaved on failure)
  * ModelName.count (still experimental) - with optional finder-args
     - override the default counter_path with your own (see example below)
@@ -43,6 +44,40 @@ Features that Hyperactive Resource has added:
  * Supports saving resources that :include other resources via:
    * Nested resource saving (creating a patient will create their associated addresses)
    * Mapping associations ([:gender].id will serialize as :gender_id)
+
+
+
+Your API
+========
+
+A number of the finder functions rely on your API actually
+accepting/returning filtered result-sets based on given parameters.
+
+HyperactiveResource assumes that your API can consume parameters passed on
+the query string and will return a set of resources that match those
+parameters.
+
+It's not necessary to pass in the extra "params" key - the finders now
+automatically add that. If you pass a specified "from" URL it will still
+fetch that.
+
+It does mean you can pass arguments to your finder functions eg:
+
+Widget.find(:all, :conditions => {:name => 'wodget'})
+Widget.first(:conditions => {:user_id => 42})
+Widget.find_all_by_user_id(42, {:name => 'wodget'})
+
+
+Currently:
+ * It will only accept conditions that are passed in as a hash (eg you can't
+  use the SQL-syntax forms such as: {:conditions => ['NAME = ?, 'blah']}
+  because (obviously) we're not using SQL...
+ * This will go out on the wire as query-string parameters. eg it will try
+  to get 'http://yourhost:3000/widgets.xml?conditions=[name=wodget]
+  It's assumed that your API can parse a query_string in that format and
+  return results appropriately.
+ * it's possible to still pass in :params => {:conditions => ...} (ie old
+  code shouldn't break) but it's not essential anymore (too complicated).
 
 Example
 =======

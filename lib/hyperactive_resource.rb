@@ -36,7 +36,6 @@ class HyperactiveResource < ActiveResource::Base
   class Errors < ActiveRecord::Errors
     
     def initialize(base) # :nodoc:
-      #p "initializing ActiveResource::Errors: methods available: #{methods.sort.inspect}"
       @base, @errors = base, {}
     end
 
@@ -647,10 +646,35 @@ class HyperactiveResource < ActiveResource::Base
         when 'all_by' 
           scope = :all
         end
-        find( scope, :params => { field_name => args } )        
+        # correctly generate a new set of conditions - based on passed-in
+        # arguments
+        case args.length
+        when 0
+          raise "Need to supply a find_by value for #{symbol}"
+        when 1
+          return find( scope,  :conditions => { field_name => args } )        
+        else # other conditions passed through
+          new_args = args.slice(1..-1)
+          conds = merge_conditions({field_name => args[0]}, *new_args)
+          return find( scope,  :conditions => conds)
+        end
       else
         super( symbol, args )
       end
+    end
+
+    # hack on find_every - if we have passed some options, but not bothered
+    # with the :params kay, automatically add it... this is so we can use
+    # standard AR syntax without having to pass in :params => :conditions =>
+    # etc every time
+    def self.find_every(options)
+      unless options.has_key?(:params)
+        # don't kill a from-value if passed in
+        from_value = options.has_key?(:from) ? options[:from].delete : nil
+        options = {:params => options} 
+        options[:from] = from_value if from_value # and add it back
+      end
+      super(options)
     end
    
     # convenience methods as per ActiveRecord
@@ -666,6 +690,23 @@ class HyperactiveResource < ActiveResource::Base
       self.find(:all, args)
     end
 
+    # Merges conditions so the result is a valid condition block
+    # Unlike ActiveRecord's merge_conditions, this merges in the hash-form
+    # before passing back a combined conditions hash
+    # Note... can't currently deal with "OR" options - and it also expects
+    # unique keys (eg if you pass in two "email = " keys it'll hjust
+    # overwrite the first with the second.
+    def self.merge_conditions(*conditions)
+      merged_conditions = {}
+
+      conditions.each do |condition|
+        # de-hashify one level if we got {:conditions => {:what_we => :really_want}}
+        condition = condition[:conditions] if condition.respond_to?(:has_key?) && condition.has_key?(:conditions)
+        raise "Merge conditions expects arguments that are hashes, not #{conditions.class.name}" unless condition.is_a? Hash
+        merged_conditions.merge!(condition) unless condition.blank?
+      end
+      merged_conditions
+    end
 
     # Counts the number of items in your API that match the given
     # conditions. 
