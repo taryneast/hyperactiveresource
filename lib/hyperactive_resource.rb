@@ -641,7 +641,7 @@ class HyperactiveResource < ActiveResource::Base
       if symbol.to_s =~ FINDER_REGEXP 
         finder_text, field_name = symbol.to_s.scan(FINDER_REGEXP).first #The ^ and $ mean only one thing will ever match this expression so use the first
         scope = :first # matches when 'find_by' or 'find_first_by'
-        case scope 
+        case finder_text 
         when 'last_by' 
           scope = :last
         when 'all_by' 
