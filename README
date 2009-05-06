@@ -47,19 +47,15 @@ Features that Hyperactive Resource has added:
 
 
 
-Your API
-========
 
-A number of the finder functions rely on your API actually
-accepting/returning filtered result-sets based on given parameters.
 
-HyperactiveResource assumes that your API can consume parameters passed on
-the query string and will return a set of resources that match those
-parameters.
 
+find 
+====
 It's not necessary to pass in the extra "params" key - the finders now
 automatically add that. If you pass a specified "from" URL it will still
 fetch that.
+
 
 It does mean you can pass arguments to your finder functions eg:
 
@@ -67,19 +63,38 @@ Widget.find(:all, :conditions => {:name => 'wodget'})
 Widget.first(:conditions => {:user_id => 42})
 Widget.find_all_by_user_id(42, {:name => 'wodget'})
 
-
 Currently:
  * It will only accept conditions that are passed in as a hash (eg you can't
   use the SQL-syntax forms such as: {:conditions => ['NAME = ?, 'blah']}
   because (obviously) we're not using SQL...
- * This will go out on the wire as query-string parameters. eg it will try
-  to get 'http://yourhost:3000/widgets.xml?conditions=[name=wodget]
-  It's assumed that your API can parse a query_string in that format and
-  return results appropriately.
  * it's possible to still pass in :params => {:conditions => ...} (ie old
   code shouldn't break) but it's not essential anymore (too complicated).
 
-Example
+
+Find and Your API
+========
+
+HyRes conditional finders assume your API can consume a URL that contains
+params formatted in a Railsy way. The way that Rails constructs these URLs
+isn't very well advertised. It seems that Rails will take a hash such as:
+{:conditions => {:user_id => 1, :name => 'wodget'}}
+and construct a URL that looks like:
+http://yourhost:3000/widgets.xml?conditions=%5Bname%5D=wodget&conditions%5Buser_id%5D=1
+
+Note the URL-encoding.
+
+If your API is also written in Rails, this will be converted back into a
+params hash that contains the original hash.
+
+
+HyRes assumes that your API can consume parameters passed on the query
+string in the above format and will return a set of resources that match
+those parameters.
+
+
+
+
+Examples
 =======
 
  1. Install the plugin via:
