@@ -79,9 +79,11 @@ params formatted in a Railsy way. The way that Rails constructs these URLs
 isn't very well advertised. It seems that Rails will take a hash such as:
 {:conditions => {:user_id => 1, :name => 'wodget'}}
 and construct a URL that looks like:
-http://yourhost:3000/widgets.xml?conditions=%5Bname%5D=wodget&conditions%5Buser_id%5D=1
+http://yourhost:3000/widgets.xml?conditions%5Bname%5D=wodget&conditions%5Buser_id%5D=1
 
-Note the URL-encoding.
+Note the URL-encoding. It evaluates to:
+http://yourhost:3000/widgets.xml?conditions[name]=wodget&conditions[user_id]=1
+
 
 If your API is also written in Rails, this will be converted back into a
 params hash that contains the original hash.
