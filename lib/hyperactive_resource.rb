@@ -182,7 +182,7 @@ class HyperactiveResource < ActiveResource::Base
     true
   end
   # unlike ActiveRecord... there's no easy way to just delete without
-  # instantiating, so just alias the above.
+  # instantiating, so this is just an alias to +destroy_all+
   def self.delete_all(conds = nil)
     self.destroy_all(conds)
   end
@@ -718,8 +718,9 @@ class HyperactiveResource < ActiveResource::Base
       conditions.each do |condition|
         # de-hashify one level if we got {:conditions => {:what_we => :really_want}}
         condition = condition[:conditions] if condition.respond_to?(:has_key?) && condition.has_key?(:conditions)
+        next if condition.blank?
         raise "Merge conditions expects arguments that are hashes, not #{conditions.class.name}" unless condition.is_a? Hash
-        merged_conditions.merge!(condition) unless condition.blank?
+        merged_conditions.merge!(condition)
       end
       merged_conditions
     end
