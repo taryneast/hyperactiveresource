@@ -6,6 +6,10 @@ class AbstractRecordError < StandardError; end
 # saved because record is invalid.
 class ResourceNotSaved < AbstractRecordError; end
 
+#--
+# Below adds the README file into the rdoc for this class
+#++
+#:include:README
 class HyperactiveResource < ActiveResource::Base
   # Quick overloading of the ActiveRecord-style naming function for the
   # model in error messages.  This will be updated when associations are
@@ -46,12 +50,12 @@ class HyperactiveResource < ActiveResource::Base
       message, options[:default] = options[:default], message if options[:default].is_a?(Symbol)
 
       defaults = [@base.class].map do |klass|
-        [ :"models.#{klass.name.underscore}.attributes.#{attribute}.#{message}", 
-          :"models.#{klass.name.underscore}.#{message}" ]
+        [ "models.#{klass.name.underscore}.attributes.#{attribute}.#{message}".to_sym, 
+          "models.#{klass.name.underscore}.#{message}".to_sym ]
       end
       
       defaults << options.delete(:default)
-      defaults = defaults.compact.flatten << :"messages.#{message}"
+      defaults = defaults.compact.flatten << "messages.#{message}".to_sym
 
       key = defaults.shift
       value = @base.respond_to?(attribute) ? @base.send(attribute) : nil

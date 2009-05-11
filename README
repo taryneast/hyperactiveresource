@@ -1,5 +1,4 @@
-HyperactiveResource
-===================
+= HyperactiveResource
 
 v0.2
 
@@ -17,16 +16,34 @@ way towards the goal of an ActiveResource that behaves like ActiveRecord.
 It will slowly be updated with all the standard features of ActiveRecord
 until (someday) it can be used almost interchangeably.
 
-This code could indeed go directly into ActiveResource, but, given some fo
-the implementations) that would put a dependancy between the two which may
-be resolved once Rails 3.0 comes out. There's nothing stopping this code
-from being integrated back into ARes at a later date :)
+This code could indeed go directly into ActiveResource, but given some of
+the implementations that would put a dependancy between the two which may
+be resolved once Rails 3.0 comes out. It is expected that the common code
+(eg callbacks and validations) should be pulled out into a common mixin
+module, with AR and ARes both onbly overrriding those that are specific to
+their own ORM...  
+There's nothing stopping this code from being integrated back into ARes in
+that fashion, but until then, this serves as an alternative that can be
+used, under the proviso that anyone using it realises that it's still
+experimental and still under construction.
 
-Features that Hyperactive Resource has added:
+
+
+
+== Features
+
+These are the features that have been added to HyRes. 
+
  * Client side validations (validates_uniqueness_of is still experimental!)
  * Hooks for before_validate, before_save
+ * Callback chaining a la ActiveRecord (still experimental - may have missed
+   some, but you can definitely use "validate :my_validation_method")
+ * conditional finders eg 
+   Widget.find(:all, :conditions => {:colour => 'blue'}, :limit => 5)
+   Depends on your API accepting the above filter fields and returning
+   something sensible. See "find" doco below for more info
  * Dynamic finders: find_by_X find_all_by_X, find_first_by_X, find_last_by_X
-     (relies on your API accepting filter fields)
+     (relies on your API accepting filter fields. See "find" doco below for more info)
  * save! / update_attributes!   (raises HyperactiveResource::ResourceNotSaved on failure)
  * ModelName.count (still experimental) - with optional finder-args
     - override the default counter_path with your own (see example below)
@@ -50,16 +67,25 @@ Features that Hyperactive Resource has added:
 
 
 
-find 
-====
-It's not necessary to pass in the extra "params" key - the finders now
+== find and Your API
+
+Find can be conditional (ie return only those resources that match your
+given set of conditions)... ion the proviso that your API actually does
+something sensible with any given set of filter_fields you pass in.
+
+HyRes has been written with an assumption that your API will behave in a
+Rails-like manner (eg will accept :conditions, :limit, :offset etc), but it
+should not break if you use other filter-terms... though the "conditions"
+key is assumed in several functions.
+
+It's no longer necessary to pass in the extra "params" key - the finders now
 automatically add that. If you pass a specified "from" URL it will still
 fetch that.
 
 
 It does mean you can pass arguments to your finder functions eg:
 
-Widget.find(:all, :conditions => {:name => 'wodget'})
+Widget.find(:all, :conditions => {:name => 'wodget'}, :limit => 5, :offset => 10)
 Widget.first(:conditions => {:user_id => 42})
 Widget.find_all_by_user_id(42, {:name => 'wodget'})
 
@@ -71,12 +97,13 @@ Currently:
   code shouldn't break) but it's not essential anymore (too complicated).
 
 
-Find and Your API
-========
+
+
+== Find-API : expected URL construction
 
 HyRes conditional finders assume your API can consume a URL that contains
 params formatted in a Railsy way. The way that Rails constructs these URLs
-isn't very well advertised. It seems that Rails will take a hash such as:
+is not well advertised. It seems that Rails will take a hash such as:
 {:conditions => {:user_id => 1, :name => 'wodget'}}
 and construct a URL that looks like:
 http://yourhost:3000/widgets.xml?conditions%5Bname%5D=wodget&conditions%5Buser_id%5D=1
@@ -96,8 +123,10 @@ those parameters.
 
 
 
-Examples
-=======
+
+
+
+== Examples
 
  1. Install the plugin via:
 
@@ -146,8 +175,12 @@ Examples
     Address.count(:phone => '555 1234') # returns 1
   etc..
 
-TODOs
-=====
+
+
+
+
+
+== TODOs
 
 0) Testing!
 
@@ -171,16 +204,24 @@ params)
 
 7) MyModel.calculate/average/minimum/maximum etc
 
+8) accessors for associations eg for Widget has_many :wodgets should be able
+  to use: a_widget.wodgets
+  Currently that fails with: 
+  "NoMethodError: undefined method `quoted_table_name' for Widget:Class"
+  an ActiveRecord assumption that you have a table...
 
-N) merge of this stuff back into the real ActiveResource
+
+N) merge this stuff back into the real ActiveResource
 
 
-Copyright and Authorship
-=========
 
-Author: Taryn East
+
+
+== Copyright and Authorship
+
+Author: *Taryn East*
 Copyright (c) 2009 White Label Dating
-http://whitelabeldating.com/
+http://whitelabeldating.com
 
 Based on Work Done by Medical Decision Logic
 
