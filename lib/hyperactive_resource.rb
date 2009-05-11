@@ -338,6 +338,7 @@ class HyperactiveResource < ActiveResource::Base
     
     # Update the resource on the remote service.
     def update
+      return false unless self.valid?
       connection.put(element_path(prefix_options), encode, self.class.headers).tap do |response|
         save_nested
         load_attributes_from_response(response)
@@ -348,6 +349,7 @@ class HyperactiveResource < ActiveResource::Base
 
     # Create (i.e., save to the remote service) the new resource.
     def create
+      return false unless self.valid?
       connection.post(collection_path, encode, self.class.headers).tap do |response|
         self.id = id_from_response(response) 
         save_nested
@@ -668,13 +670,19 @@ class HyperactiveResource < ActiveResource::Base
     # standard AR syntax without having to pass in :params => :conditions =>
     # etc every time
     def self.find_every(options)
-      unless options.has_key?(:params)
-        # don't kill a from-value if passed in
-        from_value = options.has_key?(:from) ? options[:from].delete : nil
-        options = {:params => options} 
-        options[:from] = from_value if from_value # and add it back
+      from_value = options.has_key?(:from) ? options[:from].delete : nil
+      case from_value
+      when Symbol
+        instantiate_collection(get(from, options[:params]))
+      when String
+        path = "#{from}#{query_string(options[:params])}"
+        instantiate_collection(connection.get(path, headers) || [])
+      else
+        suffix_options = options.has_key?(:suffix_options) ? options.delete(:suffix_options) : nil
+        prefix_options, query_options = split_options(options)
+        path = collection_path(prefix_options, query_options, suffix_options)
+        instantiate_collection( (connection.get(path, headers) || []), prefix_options )
       end
-      super(options)
     end
    
     # convenience methods as per ActiveRecord
@@ -693,8 +701,12 @@ class HyperactiveResource < ActiveResource::Base
     # Merges conditions so the result is a valid condition block
     # Unlike ActiveRecord's merge_conditions, this merges in the hash-form
     # before passing back a combined conditions hash
+    #
+    # Does a "merge left" so anything later in the array will overwrite
+    # anything earlier in the array.
+    #
     # Note... can't currently deal with "OR" options - and it also expects
-    # unique keys (eg if you pass in two "email = " keys it'll hjust
+    # unique keys (eg if you pass in two "email = " keys it'll just
     # overwrite the first with the second.
     def self.merge_conditions(*conditions)
       merged_conditions = {}
@@ -774,7 +786,7 @@ class HyperactiveResource < ActiveResource::Base
     #   /#{collection_path}/count.xml#{query_string(args)}
     # It uses the extended +collection_path+ with suffix_options of ['count']
     def self.default_counter_path(args)
-      self.collection_path(args, nil, ['/count'])
+      self.collection_path(args, nil, ['count'])
     end
 
     # extend collection_path to allow suffix options - which allow us to
@@ -790,12 +802,20 @@ class HyperactiveResource < ActiveResource::Base
     # User.collection_path({:group_id => 42}, {:name => 'joe'}, ['count', 'all'])
     # => '/groups/42/users/count/all.xml?name=joe'
     def self.collection_path(prefix_options = {}, query_options = nil, suffix_options = [])
+      # allow suffix options to be passed in via the "query string" options.
+      suffix_options ||= query_options.delete!(:suffix_options) if query_options && query_options.respond_to?(:has_key?) && query_options.has_key?(:suffix_options)
       # only override it if we pass in something different
       return super(prefix_options, query_options) if suffix_options.blank?
 
+      suffix_options = [suffix_options] unless suffix_options.respond_to?(:join) # arrayify! - even if we're a string
       prefix_options, query_options = split_options(prefix_options) if query_options.nil?
-      "#{prefix(prefix_options)}#{collection_name}#{suffix_options.join('/')}.#{format.extension}#{query_string(query_options)}"
+      "#{prefix(prefix_options)}#{collection_name}/#{suffix_options.join('/')}.#{format.extension}#{query_string(query_options)}"
     end
+
+    def collection_path(prefix_options = {}, query_options = nil, suffix_options = [])
+      self.class.collection_path(prefix_options, query_options, suffix_options)
+    end
+                    
 
     
 end
