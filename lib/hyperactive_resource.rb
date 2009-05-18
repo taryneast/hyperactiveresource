@@ -6,6 +6,11 @@ class AbstractRecordError < StandardError; end
 # saved because record is invalid.
 class ResourceNotSaved < AbstractRecordError; end
 
+# for HyperactiveResource method deprecations
+module Deprecation 
+  self.extend ActiveSupport::Deprecation
+end
+
 #--
 # Below adds the README file into the rdoc for this class
 #++
@@ -427,19 +432,16 @@ class HyperactiveResource < ActiveResource::Base
     #These possibly don't work! :)
     def self.belongs_to( names )
       raise ArgumentError if names.blank?
-      names = [names] unless names.respond_to?(:[]) # arrayify
       self.belong_tos << names
     end
       
     def self.has_many( names )
       raise ArgumentError if names.blank?
-      names = [names] unless names.respond_to?(:[]) # arrayify
       self.has_manys << names
     end
     
     def self.column( names )
       raise ArgumentError if names.blank?
-      names = [names] unless names.respond_to?(:[]) # arrayify
       self.columns << names
     end 
         
@@ -451,6 +453,7 @@ class HyperactiveResource < ActiveResource::Base
     def method_missing(name, *args)
       return super if attributes.keys.include? name.to_s         
       
+      # associations
       case name
       when *self.columns
         return column_getter_method_missing(name)
@@ -517,11 +520,20 @@ class HyperactiveResource < ActiveResource::Base
     #If there is _ids, but not objects array the method missing for has_many will get each object via id. Otherwise it will return
     #an empty array (like active
     def has_many_getter_method_missing( name )
-      association_ids = self.send("#{name.to_s.singularize.underscore}_ids")
-      if association_ids.nil? or association_ids.empty?
-        call_setter(name, []) #return
+      method_id_name = "#{name.to_s.singularize.underscore}_ids"
+      # see if we already have ids - and find them if we don't
+      association_ids = self.send(method_id_name) 
+      if association_ids.blank?
+        # if we get to here - then we already tried calling the
+        # collection_fetch and failed - so just say we have none.
+        call_setter( name, [] )
       else
-        #If we have blah_ids and no blahs, get them all via finds
+        # first -double-check that the id-fetch didn't auto-load the
+        # associated objects while finding the ids, otherwise we'll be
+        # doubling up on finds.
+        association_name = remove_id(name).pluralize #(residency_ids => residencies)
+        return attributes[name] if attributes.has_key?(name)
+        # didn't find any, get them all via individual finds
         associated_models = association_ids.collect do |associated_id| 
           name.to_s.singularize.camelize.constantize.send(:find, associated_id)
         end
@@ -532,10 +544,26 @@ class HyperactiveResource < ActiveResource::Base
     def has_many_ids_getter_method_missing( name )
       association_name = remove_id(name).pluralize #(residency_ids => residencies)
       unless attributes[association_name].nil?
-        call_setter(name, self.send(association_name).collect(&:id) )
+        collection_ids = attributes[association_name].collect(&:id)
       else
-        call_setter(name, [])
+        the_collection = collection_fetch(name)
+        # save these while we're at it
+        call_setter( association_name, the_collection )
+        collection_ids = the_collection.map &:id
       end
+      call_setter( name, collection_ids )
+      collection_ids
+    end
+
+    # a collection-finder for a has-many associated collection.
+    # Can take a name of: "widgets" OR "widget" or "widget_ids" and returns
+    # the set of Widget objects associated with the current object (passing
+    # self.id to the widget finder)
+    def collection_fetch(name)
+      association_name = remove_id(name).pluralize #(residency_ids => residencies)
+      the_klass = association_name.to_s.singularize.camelize
+      collection_finder_method = "find_all_by_#{self.class.name.underscore}_id"
+      the_klass.constantize.send(collection_finder_method, self.id)
     end
     
     def has_one_getter_method_missing( name )
@@ -643,6 +671,7 @@ class HyperactiveResource < ActiveResource::Base
     FINDER_REGEXP = /^find_(all_by|last_by|by)_([_a-zA-Z]\w*)$/
 
     def self.method_missing( symbol, *args )
+      # Dynamic finders
       if symbol.to_s =~ FINDER_REGEXP 
         finder_text, field_name = symbol.to_s.scan(FINDER_REGEXP).first #The ^ and $ mean only one thing will ever match this expression so use the first
         scope = :first # matches when 'find_by' or 'find_first_by'
@@ -665,6 +694,7 @@ class HyperactiveResource < ActiveResource::Base
           return find( scope,  :conditions => conds)
         end
       else
+        
         super( symbol, args )
       end
     end
@@ -713,6 +743,7 @@ class HyperactiveResource < ActiveResource::Base
     # unique keys (eg if you pass in two "email = " keys it'll just
     # overwrite the first with the second.
     def self.merge_conditions(*conditions)
+      return nil if conditions.blank?
       merged_conditions = {}
 
       conditions.each do |condition|
