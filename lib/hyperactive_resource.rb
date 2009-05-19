@@ -114,7 +114,7 @@ class HyperactiveResource < ActiveResource::Base
   end                             
   
   #This is required to make it behave like ActiveRecord
-  def attributes=(new_attributes)    
+def attributes=(new_attributes)    
     attributes.update(new_attributes)
   end
    
@@ -400,7 +400,7 @@ class HyperactiveResource < ActiveResource::Base
       before_validate
     end
 
-    # empty functions to be overloaded int he class if necessary.
+    # empty functions to be overloaded in the class if necessary.
     def validate_on_update
     end
     def validate_on_create
@@ -410,14 +410,25 @@ class HyperactiveResource < ActiveResource::Base
       #Do nothing
     end     
     
+
+
+
+    class_inheritable_accessor :columns
+    self.columns = []
+
+
+    ####################################################################
+    # Associations
+    # Public functions
+    ####################################################################
+
     class_inheritable_accessor :has_manys
     class_inheritable_accessor :nested_has_manys
     class_inheritable_accessor :has_ones
     class_inheritable_accessor :nested_has_ones
     class_inheritable_accessor :belong_tos
-    class_inheritable_accessor :columns
-    class_inheritable_accessor :skip_to_xml_for
     class_inheritable_accessor :nested_resources
+    class_inheritable_accessor :skip_to_xml_for
     
     self.nested_resources = []
     self.has_manys = []
@@ -426,8 +437,8 @@ class HyperactiveResource < ActiveResource::Base
     self.nested_has_ones = []
     self.belong_tos = []
 
-    self.columns = []
     self.skip_to_xml_for = []
+
 
     #These possibly don't work! :)
     def self.belongs_to( names )
@@ -448,12 +459,14 @@ class HyperactiveResource < ActiveResource::Base
   #  When you call any of these dynamically inferred methods 
   #  the first call sets it so it's no longer dynamic for subsequent calls
   #  Ie. If there is residencies but no residency_ids
-  #  then when you first call residency_ids it'll pull the residency ids into the residency_ids..
-  #  But future changes aren't kept in sync (like ActiveRecord.. mostly)
+  #  then when you first call residency_ids it'll pull the residency ids into the attribute: residency_ids..
+  #  But any changes aren't kept in sync (like ActiveRecord.. mostly)
+    #  so you must do a @resource.reload to clear the cache and continue on
     def method_missing(name, *args)
       return super if attributes.keys.include? name.to_s         
       
-      # associations
+      # if the name is in one of the associations sets
+      # Call the appropriate getter/setter to fetch the values
       case name
       when *self.columns
         return column_getter_method_missing(name)
@@ -483,17 +496,17 @@ class HyperactiveResource < ActiveResource::Base
       super
     end
     
-    #Used by method_missing & load to infer setter & getter names from association names
+    # Used by method_missing & load to infer setter & getter names from association names
     def has_many_ids    
       self.has_manys.map { |hm| "#{hm.to_s.singularize}_ids".to_sym }
     end
     
-    #Used by method_missing & load to infer setter & getter names from association names
+    # Used by method_missing & load to infer setter & getter names from association names
     def belong_to_ids
       self.belong_tos.map { |bt| "#{bt}_id".to_sym }
     end
     
-    #Calls to column getter when there is no attribute for it, nor a previous set called it will return nil rather than freak out
+    # Calls to column getter when there is no attribute for it, nor a previous set called it will return nil rather than freak out
     def column_getter_method_missing( name )
       self.call_setter(name, nil)
     end
@@ -581,7 +594,7 @@ class HyperactiveResource < ActiveResource::Base
     def remove_id( name_with_id )
       name_with_id.to_s.gsub(/_ids?$/,'')
     end
-    
+
     #There are lots of differences between active_resource's initializer and active_record's
     #ARec lets you pass a block 
     #Arec doesn't clone
