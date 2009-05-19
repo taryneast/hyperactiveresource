@@ -241,6 +241,16 @@ def attributes=(new_attributes)
   def respond_to?(method, include_private = false)
     attribute_getter?(method) || attribute_setter?(method) || super
   end
+
+  # reload should force the object to be completely new
+  # Currently there aren't any options - but the param is there to match
+  # with ActiveRecord.
+  def reload(options = nil)
+    the_id = self.id # remember the id (or it gets lost in the next step)
+    @attributes = {}  # clear out everything
+    # go find myself and reload based on the set of attributes found
+    self.load(self.class.find(the_id, options).instance_variable_get('@attributes'))
+  end
   
   # copy/pasted from http://dev.rubyonrails.org/attachment/ticket/7308/reworked_activeresource_update_attributes_patch.diff
   #
