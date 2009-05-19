@@ -498,12 +498,12 @@ def attributes=(new_attributes)
     
     # Used by method_missing & load to infer setter & getter names from association names
     def has_many_ids    
-      self.has_manys.map { |hm| "#{hm.to_s.singularize}_ids".to_sym }
+      @has_many_ids ||= self.has_manys.map { |hm| "#{hm.to_s.singularize}_ids".to_sym }
     end
     
     # Used by method_missing & load to infer setter & getter names from association names
     def belong_to_ids
-      self.belong_tos.map { |bt| "#{bt}_id".to_sym }
+      @belong_to_ids ||= self.belong_tos.map { |bt| "#{bt}_id".to_sym }
     end
     
     # Calls to column getter when there is no attribute for it, nor a previous set called it will return nil rather than freak out
