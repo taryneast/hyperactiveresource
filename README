@@ -150,6 +150,7 @@ those parameters.
 
  2. Create a HyperactiveResource where you would normally use ActiveResource
     and define the meta-data/associations that drive the dynamic magic:
+    NOTE: don't use HyperactiveResource::Base... there isn't one (..yet)!
 
     class Address < HyperactiveResource
       self.site = 'http://localhost:3001/'
@@ -219,9 +220,11 @@ those parameters.
   an ActiveRecord assumption that you have a table...
 
 7) reflections. There should be no reason why we can't re-use
-ActiveRecord-style reflections for our associations. They are not
-SQL-specific. This will also allow a lot more code to automatically Just
-Work (eg an ActiveRecord could use "has_many :through" a HyRes)
+  ActiveRecord-style reflections for our associations. They are not
+  SQL-specific. This will also allow a lot more code to automatically Just
+  Work (eg an ActiveRecord could use "has_many :through" a HyRes)
+
+8) Split HyRes into Base and other grouped functions as per AR
 
 
 N) merge this stuff back into the real ActiveResource
