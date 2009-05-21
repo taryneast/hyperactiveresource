@@ -139,9 +139,11 @@ those parameters.
     class Address < HyperactiveResource
       self.site = 'http://localhost:3001/'
       self.columns = [ :street_address, :city, :postcode, :phone, :email]
-      self.belong_tos = [ :country, :state ]
-      self.has_manys = [ :people ]
       self.counter_path = 'address_count.xml' # override default count path
+
+      belongs_to :country
+      belongs_to :state
+      has_many :people
 
       validates_presence_of :postcode, :phone
       validates_uniqueness_of :email
@@ -184,31 +186,27 @@ those parameters.
 
 0) Testing!
 
-1) ability to use ActiveRecord-style nomenclature for associations eg:
-    has_many :x, :y, :z
-  instead of: 
-    self.has_manys = [:x, :y, :z]
-
-2) proper callbacks for before/after save/create/validate etc rather than
+1) proper callbacks for before/after save/create/validate etc rather than
   bodgied-up functions called directly in the code
 
-3) conditional finders (eg MyModel.find(:all, :conditions => {:state =>
-'active'} (partly works, but experimental - depends on your API accepting
-params)
+2) MyModel.with_scope
 
-4) MyModel.with_scope
+3) find(:include => ...)
 
-5) find(:include => ...)
+4) attr_protected/attr_accessible
 
-6) attr_protected/attr_accessible
+5) MyModel.calculate/average/minimum/maximum etc
 
-7) MyModel.calculate/average/minimum/maximum etc
-
-8) accessors for associations eg for Widget has_many :wodgets should be able
+6) accessors for associations eg for Widget has_many :wodgets should be able
   to use: a_widget.wodgets
   Currently that fails with: 
   "NoMethodError: undefined method `quoted_table_name' for Widget:Class"
   an ActiveRecord assumption that you have a table...
+
+7) reflections. There should be no reason why we can't re-use
+ActiveRecord-style reflections for our associations. They are not
+SQL-specific. This will also allow a lot more code to automatically Just
+Work (eg an ActiveRecord could use "has_many :through" a HyRes)
 
 
 N) merge this stuff back into the real ActiveResource
