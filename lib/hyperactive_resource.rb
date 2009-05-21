@@ -706,16 +706,15 @@ def attributes=(new_attributes)
         end
         # correctly generate a new set of conditions - based on passed-in
         # arguments
-        case args.length
-        when 0
+        if 0 == args.length
           raise "Need to supply a find_by value for #{symbol}"
-        when 1
-          return find( scope,  :conditions => { field_name => args } )        
-        else # other conditions passed through
-          new_args = args.slice(1..-1)
-          conds = merge_conditions({field_name => args[0]}, *new_args)
-          return find( scope,  :conditions => conds)
         end
+        conds = { field_name => args[0] }
+        if args.length > 1
+          new_args = args.slice(1..-1)
+          conds = merge_conditions(conds, *new_args)
+        end
+        return find( scope,  :conditions => conds)
       else
         
         super( symbol, args )
