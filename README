@@ -226,6 +226,10 @@ those parameters.
 
 8) Split HyRes into Base and other grouped functions as per AR
 
+9) default_scope (as per AR)
+
+10) validates_associated (as per AR)
+
 
 N) merge this stuff back into the real ActiveResource
 
