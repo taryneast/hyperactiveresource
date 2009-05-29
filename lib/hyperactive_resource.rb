@@ -173,17 +173,10 @@ def attributes=(new_attributes)
   # somne standard Rails pre-generated code)... make sure it handles the xml
   # format nicely sending either a 200 or a 404 where appropriate
   def self.destroy_all(conditions = nil)
-    begin
-      matches = find(:all, :conditions => conditions)
-      unless matches.blank?
-        matches = [matches] unless matches.respond_to?(:[]) # arrayify
-        matches.each { |object| object.destroy  }
-      end
-    rescue ActiveResource::ResourceNotFound
-      # we want to do nothing here... basically it just found nothing
-      # matching the given conditions
-      return nil
-    end
+    matches = find(:all, :conditions => conditions)
+    return true if matches.blank? # short circuit
+    matches = [matches] unless matches.respond_to?(:[]) # arrayify
+    matches.each { |object| object.destroy  }
     true
   end
   # unlike ActiveRecord... there's no easy way to just delete without
@@ -192,7 +185,6 @@ def attributes=(new_attributes)
     self.destroy_all(conds)
   end
 
-     
   # Saves the model
   #
   # This will save remotely after making sure there are no local errors
@@ -570,9 +562,13 @@ def attributes=(new_attributes)
         collection_ids = attributes[association_name].collect(&:id)
       else
         the_collection = collection_fetch(name)
-        # save these while we're at it
-        call_setter( association_name, the_collection )
-        collection_ids = the_collection.map &:id
+        if the_collection.blank?
+          call_setter( name, [] )
+        else
+          # save these while we're at it
+          call_setter( association_name, the_collection )
+          collection_ids = the_collection.map &:id
+        end
       end
       call_setter( name, collection_ids )
       collection_ids
@@ -586,6 +582,7 @@ def attributes=(new_attributes)
       association_name = remove_id(name).pluralize #(residency_ids => residencies)
       the_klass = association_name.to_s.singularize.camelize
       collection_finder_method = "find_all_by_#{self.class.name.underscore}_id"
+
       the_klass.constantize.send(collection_finder_method, self.id)
     end
     
@@ -726,21 +723,27 @@ def attributes=(new_attributes)
     # standard AR syntax without having to pass in :params => :conditions =>
     # etc every time
     def self.find_every(options)
-      from_value = options.has_key?(:from) ? options[:from].delete : nil
-      case from_value
-      when Symbol
-        instantiate_collection(get(from, options[:params]))
-      when String
-        path = "#{from}#{query_string(options[:params])}"
-        instantiate_collection(connection.get(path, headers) || [])
-      else
-        suffix_options = options.has_key?(:suffix_options) ? options.delete(:suffix_options) : nil
-        prefix_options, query_options = split_options(options)
-        path = collection_path(prefix_options, query_options, suffix_options)
-        instantiate_collection( (connection.get(path, headers) || []), prefix_options )
+      begin
+        from_value = options.has_key?(:from) ? options[:from].delete : nil
+        case from_value
+        when Symbol
+          instantiate_collection(get(from, options[:params]))
+        when String
+          path = "#{from}#{query_string(options[:params])}"
+          instantiate_collection(connection.get(path, headers) || [])
+        else
+          suffix_options = options.has_key?(:suffix_options) ? options.delete(:suffix_options) : nil
+          prefix_options, query_options = split_options(options)
+          path = collection_path(prefix_options, query_options, suffix_options)
+          instantiate_collection( (connection.get(path, headers) || []), prefix_options )
+        end
+      rescue ActiveResource::ResourceNotFound
+        # We should be swallowing RecordNotFound exceptions and returning
+        # nil - as per ActiveRecord.
+        nil
       end
     end
-   
+ 
     # convenience methods as per ActiveRecord
     def self.first(args = {})
       self.find(:first, args)
@@ -819,7 +822,7 @@ def attributes=(new_attributes)
           self.find(:one, args.merge(:from => try_path)).count
         else
           # try the default counter path.
-            self.find(:one, :from => self.default_counter_path(args)).count
+          self.find(:one, :from => self.default_counter_path(args)).count
         end
       rescue ActiveResource::ResourceNotFound
         # if it all goes horribly, horribly wrong - fall back on the long way
