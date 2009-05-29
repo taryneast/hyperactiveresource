@@ -580,11 +580,40 @@ def attributes=(new_attributes)
     # self.id to the widget finder)
     def collection_fetch(name)
       association_name = remove_id(name).pluralize #(residency_ids => residencies)
-      the_klass = association_name.to_s.singularize.camelize
-      collection_finder_method = "find_all_by_#{self.class.name.underscore}_id"
+      the_klass_name = association_name.to_s.singularize.camelize
+      the_klass = the_klass_name.constantize
+      my_klass_name = self.class.name.underscore
+      my_klass_id = my_klass_name + '_id'
 
-      the_klass.constantize.send(collection_finder_method, self.id)
+      # if we are a nested resource (ie the remote API uses a nested route
+      # for this resource eg /users/:user_id/widgets)
+      # - generate the path_prefix (eg /users/:user_id)
+      if the_klass.nested && the_klass.nested.to_sym == my_klass_name.to_sym
+        # generate a quick-trick prefix path on the nested resource and pass
+        # in the required prefix option which is our own id
+        prefix_path = "/#{my_klass_name.pluralize}/:#{my_klass_id}/"
+        the_klass.prefix = prefix_path
+        opts = {my_klass_id.to_sym => self.id}
+        the_klass.find_every(opts)
+      else
+        # otherwise use a standard collection finder - but pass in the
+        # parent's id as a condition
+        collection_finder_method = "find_all_by_#{my_klass_id}"
+        the_klass.send(collection_finder_method, self.id)
+      end
     end
+
+    # If an association uses a nested route - you can just pass in the
+    # association-name to "nested" and the nesting will be automatically
+    # handled by HyRes. This is an alternative to using "prefix="
+    def self.nested=(val)
+      @nested = val
+    end
+    # just returns the current value for "nested"
+    def self.nested
+      @nested
+    end
+
     
     def has_one_getter_method_missing( name )
       self.new? ? nil : 
@@ -724,7 +753,7 @@ def attributes=(new_attributes)
     # etc every time
     def self.find_every(options)
       begin
-        from_value = options.has_key?(:from) ? options[:from].delete : nil
+        from_value = options.respond_to?(:has_key?) && options.has_key?(:from) ? options[:from].delete : nil
         case from_value
         when Symbol
           instantiate_collection(get(from, options[:params]))
@@ -732,8 +761,8 @@ def attributes=(new_attributes)
           path = "#{from}#{query_string(options[:params])}"
           instantiate_collection(connection.get(path, headers) || [])
         else
-          suffix_options = options.has_key?(:suffix_options) ? options.delete(:suffix_options) : nil
           prefix_options, query_options = split_options(options)
+          suffix_options = query_options.has_key?(:suffix_options) ? query_options.delete(:suffix_options) : nil
           path = collection_path(prefix_options, query_options, suffix_options)
           instantiate_collection( (connection.get(path, headers) || []), prefix_options )
         end
@@ -810,6 +839,7 @@ def attributes=(new_attributes)
     # foul of validation...
     def self.count(args = {})
       begin
+        raise "Must pass a nested-resource's id to count" if nested && !args.has_key?("#{nested.to_s.singularize}_id".to_sym)
         # try the neato way assuming a "count_widgets" collection path
         # has been passed in
         try_path = self.counter_path
@@ -819,14 +849,16 @@ def attributes=(new_attributes)
           args.delete(:counter_path)
         end
         if !try_path.blank?
-          self.find(:one, args.merge(:from => try_path)).count
+          them = self.find(:one, args.merge(:from => try_path))
+          (them || []).count
         else
           # try the default counter path.
-          self.find(:one, :from => self.default_counter_path(args)).count
+          them = self.find(:one, :from => self.default_counter_path(args))
+          (them || []).count
         end
       rescue ActiveResource::ResourceNotFound
         # if it all goes horribly, horribly wrong - fall back on the long way
-        self.find(:all, args).length
+        (self.find(:all, args) || []).length
       end
     end
 
