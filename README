@@ -60,6 +60,9 @@ These are the features that have been added to HyRes.
    something sensible. See "find" doco below for more info
  * Dynamic finders: find_by_X, find_all_by_X, find_first_by_X, find_last_by_X
      (relies on your API accepting filter fields. See "find" doco below for more info)
+ * no 404-explosion for collection-finders that don't return anything They
+   just return nil (just like ActiveRecord). This includes finders for
+   associations eg User.posts will return nil if the user hasn't any.
 
 
 === Validations
