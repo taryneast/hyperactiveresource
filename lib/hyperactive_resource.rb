@@ -114,7 +114,7 @@ class HyperactiveResource < ActiveResource::Base
   end                             
   
   #This is required to make it behave like ActiveRecord
-def attributes=(new_attributes)    
+  def attributes=(new_attributes)    
     attributes.update(new_attributes)
   end
    
@@ -567,11 +567,20 @@ def attributes=(new_attributes)
         # doubling up on finds.
         association_name = self.class.remove_id(name).pluralize #(residency_ids => residencies)
         return attributes[name] if attributes.has_key?(name)
+
         # didn't find any, get them all via individual finds
+        the_klass = self.class.foreign_key_to_class(name)
+
+        # if we're a nested resource - add our own id into the mix
+        my_klass_name = self.class.name.underscore
+        my_klass_id = (my_klass_name + '_id').to_sym
+        opts = the_klass.nested && the_klass.nested == my_klass_name.to_sym ? {my_klass_id => self.id}  : {}
+
         associated_models = association_ids.collect do |associated_id| 
-          name.to_s.singularize.camelize.constantize.send(:find, associated_id)
+          the_klass.find_every(:conditions => opts.merge(:id => associated_id))
         end
-        call_setter(name, associated_models) #return
+
+        call_setter(name, associated_models)
       end
     end
     
@@ -621,6 +630,7 @@ def attributes=(new_attributes)
       remove_id(name.to_s).classify.constantize
     end
 
+    class_inheritable_accessor :nested
     # If an association uses a nested route - you can just pass in the
     # association-name to "nested" and the nesting will be automatically
     # handled by HyRes. This automatically adds the appropraite "prefix="
@@ -636,7 +646,7 @@ def attributes=(new_attributes)
     end
     # just returns the current value for "nested"
     def self.nested
-      @nested
+      @nested || false
     end
 
     
@@ -922,6 +932,7 @@ def attributes=(new_attributes)
     def self.collection_path(prefix_options = {}, query_options = nil, suffix_options = [])
       # allow suffix options to be passed in via the "query string" options.
       suffix_options ||= query_options.delete!(:suffix_options) if query_options && query_options.respond_to?(:has_key?) && query_options.has_key?(:suffix_options)
+
       # only override it if we pass in something different
       return super(prefix_options, query_options) if suffix_options.blank?
 
@@ -930,7 +941,15 @@ def attributes=(new_attributes)
       "#{prefix(prefix_options)}#{collection_name}/#{suffix_options.join('/')}.#{format.extension}#{query_string(query_options)}"
     end
 
+    # a collection path for an existing instance may be different to that
+    # for an uninitialized object - mainly becasue nested resources will
+    # possibly refer to a nested id - and we'll need to pass that in as a
+    # specific prefix_option so the scope isn't lost.
+    # for some reason - this doesn't work correctly in ARes - probably
+    # because it uses options || prefix_options - when we really need to
+    # merge them in.
     def collection_path(prefix_options = {}, query_options = nil, suffix_options = [])
+      prefix_options = @prefix_options.merge(prefix_options)
       self.class.collection_path(prefix_options, query_options, suffix_options)
     end
                     
