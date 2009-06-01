@@ -570,14 +570,17 @@ class HyperactiveResource < ActiveResource::Base
 
         # didn't find any, get them all via individual finds
         the_klass = self.class.foreign_key_to_class(name)
-
-        # if we're a nested resource - add our own id into the mix
         my_klass_name = self.class.name.underscore
+
         my_klass_id = (my_klass_name + '_id').to_sym
-        opts = the_klass.nested && the_klass.nested == my_klass_name.to_sym ? {my_klass_id => self.id}  : {}
+        opts = the_klass.nested && the_klass.nested == my_klass_name.to_sym ? {my_klass_id => self.id}  : nil
 
         associated_models = association_ids.collect do |associated_id| 
-          the_klass.find_every(:conditions => opts.merge(:id => associated_id))
+          if opts
+            the_klass.find_every(:conditions => opts.merge(:id => associated_id))
+          else
+            the_klass.find(associated_id)
+          end
         end
 
         call_setter(name, associated_models)
