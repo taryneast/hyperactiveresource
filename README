@@ -79,6 +79,10 @@ These are the features that have been added to HyRes.
  * Supports saving resources that :include other resources via:
    * Nested resource saving (creating a patient will create their associated addresses)
    * Mapping associations ([:gender].id will serialize as :gender_id)
+ * Can fetch associations even with a nested route by using the ":nested"
+   option on the nested resource's class. This command automatically adds a
+   prefix-path, and will pre-populate the parent's id when you do an
+   association collection_fetch.
 
 
 
@@ -140,6 +144,35 @@ those parameters.
 
 
 
+If you have a nested route for nested resources, you can use a prefix path
+
+
+
+
+== Nested Resource routes and associations.
+
+If your remote API has a nested route that matches Rails-standard
+nested-route naming conventions eg: '/users/:user_id/widgets.xml'
+Your association 'widget' class will need to pass in the prefix-options when
+doing a collection-fetch (eg '@user.widgets').
+Standard ARes also requires that you setup a prefix-path for the Widget
+class.
+Now, the 'nested' option will allow you to do both of these tasks
+automatically eg:
+
+class User < HyRes
+  has_many :widgets
+end
+class Widget < HyRes
+  belongs_to :user, :nested => true
+end
+
+will mean that: @user.widgets will call the URL:
+/users/<@user.id>/widgets.xml
+
+
+At present this will only deal with one level of nesting... it will also
+blow away any pre-existing prefix-path... so use at your own peril ;)
 
 
 

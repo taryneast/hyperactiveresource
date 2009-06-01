@@ -442,9 +442,28 @@ def attributes=(new_attributes)
     self.skip_to_xml_for = []
 
 
-    #These possibly don't work! :)
-    def self.belongs_to( names )
+    # As per ActiveRecord - belongs_to allows you to associate one kind of
+    # class with another through an id that is stored on the class that
+    # declares the belongs_to relationship.
+    # No AR-standard options work atm, but HyRes has it's own special option
+    # for belongs_to associations, namely ':nested'
+    # If nested is set to true - it assumes that this belongs_to
+    # relationship also implies a nested-resource route on the remote API.
+    # At present, we can only deal with a single prefix_path option (later
+    # this may expand) - so we'll bail out if more than one belongs_to has
+    # this option passed-in.
+    # See README doc for more information about this.
+    def self.belongs_to( names, opts = {} )
       raise ArgumentError if names.blank?
+      if !opts.blank?
+        # setup a nested resource route for this belongs_to association.
+        if opts.has_key?(:nested) && opts[:nested] 
+          raise ArgumentError, "the nested option can only deal with a single association at present, you passed #{names.length}" if names.blank? || (names.acts_like?(:array) && names.length != 1)
+          # dearrayify if necessary
+          the_name = names.acts_like?(:array) ? names[0] : names
+          self.nested = the_name
+        end
+      end
       self.belong_tos << names
     end
       
@@ -524,7 +543,7 @@ def attributes=(new_attributes)
     #Getter for a belong_to's id will return the object.id if it exists
     def belong_to_id_getter_method_missing( name )
       #The assumption is that this will always be called with a name that ends in _id   
-      association_name = remove_id name
+      association_name = self.class.remove_id name
       unless attributes[association_name].nil? #If there is the obj itself rather than the blah_id
         call_setter( name, self.send(association_name).id ) #Use the blah.id for blah_id
       else  
@@ -546,7 +565,7 @@ def attributes=(new_attributes)
         # first -double-check that the id-fetch didn't auto-load the
         # associated objects while finding the ids, otherwise we'll be
         # doubling up on finds.
-        association_name = remove_id(name).pluralize #(residency_ids => residencies)
+        association_name = self.class.remove_id(name).pluralize #(residency_ids => residencies)
         return attributes[name] if attributes.has_key?(name)
         # didn't find any, get them all via individual finds
         associated_models = association_ids.collect do |associated_id| 
@@ -557,7 +576,7 @@ def attributes=(new_attributes)
     end
     
     def has_many_ids_getter_method_missing( name )
-      association_name = remove_id(name).pluralize #(residency_ids => residencies)
+      association_name = self.class.remove_id(name).pluralize #(residency_ids => residencies)
       unless attributes[association_name].nil?
         collection_ids = attributes[association_name].collect(&:id)
       else
@@ -579,35 +598,41 @@ def attributes=(new_attributes)
     # the set of Widget objects associated with the current object (passing
     # self.id to the widget finder)
     def collection_fetch(name)
-      association_name = remove_id(name).pluralize #(residency_ids => residencies)
-      the_klass_name = association_name.to_s.singularize.camelize
-      the_klass = the_klass_name.constantize
+      the_klass = self.class.foreign_key_to_class(name)
       my_klass_name = self.class.name.underscore
-      my_klass_id = my_klass_name + '_id'
 
       # if we are a nested resource (ie the remote API uses a nested route
       # for this resource eg /users/:user_id/widgets)
-      # - generate the path_prefix (eg /users/:user_id)
+      # add ourself into the options
       if the_klass.nested && the_klass.nested.to_sym == my_klass_name.to_sym
-        # generate a quick-trick prefix path on the nested resource and pass
-        # in the required prefix option which is our own id
-        prefix_path = "/#{my_klass_name.pluralize}/:#{my_klass_id}/"
-        the_klass.prefix = prefix_path
-        opts = {my_klass_id.to_sym => self.id}
+        opts = {(my_klass_name+'_id').to_sym => self.id}
         the_klass.find_every(opts)
       else
         # otherwise use a standard collection finder - but pass in the
         # parent's id as a condition
-        collection_finder_method = "find_all_by_#{my_klass_id}"
+        collection_finder_method = "find_all_by_#{my_klass_name}_id"
         the_klass.send(collection_finder_method, self.id)
       end
+    end
+    # quickie helper to turn a given name into a class constant
+    # eg :user_id => <User>
+    # Useful when you have a foreign-key and want the association.
+    def self.foreign_key_to_class(name)
+      remove_id(name.to_s).classify.constantize
     end
 
     # If an association uses a nested route - you can just pass in the
     # association-name to "nested" and the nesting will be automatically
-    # handled by HyRes. This is an alternative to using "prefix="
-    def self.nested=(val)
-      @nested = val
+    # handled by HyRes. This automatically adds the appropraite "prefix="
+    # for you - and will be called appropriately in the collection_fetch for
+    # association-fetching
+    def self.nested=(name)
+      # generate a quick-trick prefix path on the nested resource and pass
+      # in the required prefix option which is our own id
+      the_class_name = name.to_s.underscore
+      # add the nested resource as a prefix-path
+      self.prefix = "/#{the_class_name.pluralize}/:#{the_class_name}_id/"
+      @nested = name
     end
     # just returns the current value for "nested"
     def self.nested
@@ -627,7 +652,7 @@ def attributes=(new_attributes)
     end
     
     #Chops the _id off the end of a method name to be used in method_missing
-    def remove_id( name_with_id )
+    def self.remove_id( name_with_id )
       name_with_id.to_s.gsub(/_ids?$/,'')
     end
 
