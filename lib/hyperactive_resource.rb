@@ -2,10 +2,6 @@
 # saved because record is invalid.
 class AbstractRecordError < StandardError; end
 
-# Raised by ActiveRecord::Base.save! and ActiveRecord::Base.create! methods when record cannot be
-# saved because record is invalid.
-class ResourceNotSaved < AbstractRecordError; end
-
 # for HyperactiveResource method deprecations
 module Deprecation 
   self.extend ActiveSupport::Deprecation
@@ -16,6 +12,11 @@ end
 #++
 #:include:README
 class HyperactiveResource < ActiveResource::Base
+
+  # Raised by ActiveRecord::Base.save! and ActiveRecord::Base.create! methods when record cannot be
+  # saved because record is invalid.
+  class ResourceNotSaved < AbstractRecordError; end
+
   # Quick overloading of the ActiveRecord-style naming function for the
   # model in error messages.  This will be updated when associations are
   # complete
