@@ -238,10 +238,10 @@ class HyperactiveResource < ActiveResource::Base
   # Currently there aren't any options - but the param is there to match
   # with ActiveRecord.
   def reload(options = nil)
-    the_id = self.id # remember the id (or it gets lost in the next step)
+    the_id = self.to_param # remember the id (or it gets lost in the next step)
     @attributes = {}  # clear out everything
     # go find myself and reload based on the set of attributes found
-    self.load(self.class.find(the_id, options).instance_variable_get('@attributes'))
+    self.load(self.class.find(the_id, :params => @prefix_options).instance_variable_get('@attributes'))
   end
   
   # copy/pasted from http://dev.rubyonrails.org/attachment/ticket/7308/reworked_activeresource_update_attributes_patch.diff
@@ -484,13 +484,11 @@ class HyperactiveResource < ActiveResource::Base
   #  But any changes aren't kept in sync (like ActiveRecord.. mostly)
     #  so you must do a @resource.reload to clear the cache and continue on
     def method_missing(name, *args)
-      return super if attributes.keys.include? name.to_s         
-      
+      return super if attributes.keys.include? name.to_s
+
       # if the name is in one of the associations sets
       # Call the appropriate getter/setter to fetch the values
-      case name
-      when *self.columns
-        return column_getter_method_missing(name)
+      case name.to_sym
       when *self.belong_tos
         return belong_to_getter_method_missing(name)
       when *self.belong_to_ids
@@ -501,20 +499,11 @@ class HyperactiveResource < ActiveResource::Base
         return has_many_ids_getter_method_missing(name)
       when *self.has_ones
         return has_one_getter_method_missing(name)      
+      when *self.columns
+        return column_getter_method_missing(name)
       end                                     
 
-      # hkau
-      # something like this to support "nested xxxx="
-      #
-      # if name.to_s.ends_with?('=')
-      #   setter_name = name.to_s[0..(name.to_s.length-2)]
-      #   puts "---------- setter_name #{setter_name}"
-      #   if nested_has_ones.include?(setter_name.to_sym)
-      #     return send "#{setter_name}_id=", args[0].id
-      #   end
-      # end
-
-      super
+      super(name, *args)
     end
     
     # Used by method_missing & load to infer setter & getter names from association names
@@ -534,21 +523,32 @@ class HyperactiveResource < ActiveResource::Base
     
     #Getter for a belong_to relationship checks if the _id exists and dynamically finds the object
     def belong_to_getter_method_missing( name )
-      #If there is a blah_id but not blah get it via a find
+      # fetch the id (will fetch the object too)
       association_id = self.send("#{name.to_s.underscore}_id")
-      (association_id.nil? or ( association_id.respond_to? :empty? and association_id.empty? ) ) ? 
-        nil : call_setter(name, name.to_s.camelize.constantize.send(:find, association_id ) )
+      return nil if association_id.blank? 
+
+      #If there is a blah_id but not blah get it via a find
+      call_setter(name, name.to_s.camelize.constantize.find(association_id))
     end
     
     #Getter for a belong_to's id will return the object.id if it exists
     def belong_to_id_getter_method_missing( name )
       #The assumption is that this will always be called with a name that ends in _id   
       association_name = self.class.remove_id name
-      unless attributes[association_name].nil? #If there is the obj itself rather than the blah_id
-        call_setter( name, self.send(association_name).id ) #Use the blah.id for blah_id
-      else  
-        column_getter_method_missing( name ) #call_setter( name, nil ) #Just like a column
+      # If there is the obj itself rather than the blah_id Use the blah.id for blah_id
+      return call_setter( name, attributes[association_name].id ) unless attributes[association_name].nil?
+
+      # if we're a nested resource - the id may have been snatched away
+      # and stashed in the prefix_options
+      if self.nested.to_sym == association_name.to_sym
+        assn_id = (association_name+'_id').to_sym
+        if !@prefix_options.blank? && @prefix_options.has_key?(assn_id)
+          return call_setter( name, @prefix_options[assn_id])
+        end
       end
+
+      # call_setter( name, nil ) - Just like a column
+      column_getter_method_missing( name ) 
     end
     
     #If there is _ids, but not objects array the method missing for has_many will get each object via id. Otherwise it will return
@@ -957,5 +957,27 @@ class HyperactiveResource < ActiveResource::Base
     end
                     
 
-    
+    private #####################################################################
+
+      # override ARes's normal split_options.
+      # split an option hash into two hashes, one containing the prefix options,
+      # and the other containing the leftovers.
+      def self.split_options(options = {})
+        prefix_options, query_options = {}, {}
+
+        (options || {}).each do |key, value|
+          next if key.blank?
+          (prefix_parameters.include?(key.to_sym) ? prefix_options : query_options)[key.to_sym] = value
+        end
+        # It's possible that some of the prefix_options come through inside
+        # the :conditions - in which case - we still want them int he
+        # prefix_options (though leave them otherwise).
+        if !options.blank? && options.respond_to?(:has_key?) && options.has_key?(:conditions) && !options[:conditions].blank?
+          options[:conditions].each do |key, value|
+            prefix_options[key.to_sym] = value if !key.blank? && !value.blank? && prefix_parameters.include?(key.to_sym)
+          end
+        end
+
+        [ prefix_options, query_options ]
+      end
 end
