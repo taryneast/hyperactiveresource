@@ -787,7 +787,7 @@ class HyperactiveResource < ActiveResource::Base
     end
 
     # hack on find_every - if we have passed some options, but not bothered
-    # with the :params kay, automatically add it... this is so we can use
+    # with the :params key, automatically add it... this is so we can use
     # standard AR syntax without having to pass in :params => :conditions =>
     # etc every time
     def self.find_every(options)
@@ -810,6 +810,22 @@ class HyperactiveResource < ActiveResource::Base
         # nil - as per ActiveRecord.
         nil
       end
+    end
+
+    # hack on find_single to params-ify the options automatically
+    # This allows us to pass in AR-style options (eg :conditions => etc)
+    # without having to add a :params in front of it
+    def self.find_single(id, opts)
+      super(id, paramsify_options(opts))
+    end
+
+    def self.paramsify_options(opts)
+      return opts if opts.blank? || !opts.respond_to?(:has_key?) || opts.has_key?(:params)
+
+      from_value = opts.delete(:from)
+      options = {:params => opts}
+      options[:from] = from_value if from_value
+      options
     end
  
     # convenience methods as per ActiveRecord
