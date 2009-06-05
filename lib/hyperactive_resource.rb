@@ -578,7 +578,7 @@ class HyperactiveResource < ActiveResource::Base
 
         associated_models = association_ids.collect do |associated_id| 
           if opts
-            the_klass.find_every(:conditions => opts.merge(:id => associated_id))
+            the_klass.find(:all, :conditions => opts.merge(:id => associated_id))
           else
             the_klass.find(associated_id)
           end
@@ -779,7 +779,7 @@ class HyperactiveResource < ActiveResource::Base
           new_args = args.slice(1..-1)
           conds = merge_conditions(conds, *new_args)
         end
-        return find( scope,  :conditions => conds)
+        return find( scope, :conditions => conds)
       else
         
         super( symbol, args )
@@ -801,7 +801,7 @@ class HyperactiveResource < ActiveResource::Base
           instantiate_collection(connection.get(path, headers) || [])
         else
           prefix_options, query_options = split_options(options)
-          suffix_options = query_options.has_key?(:suffix_options) ? query_options.delete(:suffix_options) : nil
+          suffix_options = query_options.delete(:suffix_options)
           path = collection_path(prefix_options, query_options, suffix_options)
           instantiate_collection( (connection.get(path, headers) || []), prefix_options )
         end
@@ -989,12 +989,17 @@ class HyperactiveResource < ActiveResource::Base
         # It's possible that some of the prefix_options come through inside
         # the :conditions - in which case - we still want them int he
         # prefix_options (though leave them otherwise).
-        if !options.blank? && options.respond_to?(:has_key?) && options.has_key?(:conditions) && !options[:conditions].blank?
-          options[:conditions].each do |key, value|
+        if !options.blank? && options.respond_to?(:has_key?) && query_options.has_key?(:conditions) && !query_options[:conditions].blank?
+          conds_to_keep = {}
+          query_options.delete(:conditions).each do |key, value|
             if !key.blank? && !value.blank?
-              query_options.delete(key.to_sym) if prefix_options.has_key?(key.to_sym)
+              the_key = key.to_sym
+              # pull prefix params out of the conditions
+              prefix_options[the_key] = value if prefix_parameters.include?(the_key)
+              conds_to_keep[the_key] = value unless prefix_options.has_key?(the_key)
             end
           end
+          query_options[:conditions] = conds_to_keep unless conds_to_keep.blank?
         end
 
         [ prefix_options, query_options ]
