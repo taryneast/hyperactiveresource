@@ -991,7 +991,9 @@ class HyperactiveResource < ActiveResource::Base
         # prefix_options (though leave them otherwise).
         if !options.blank? && options.respond_to?(:has_key?) && options.has_key?(:conditions) && !options[:conditions].blank?
           options[:conditions].each do |key, value|
-            prefix_options[key.to_sym] = value if !key.blank? && !value.blank? && prefix_parameters.include?(key.to_sym)
+            if !key.blank? && !value.blank?
+              query_options.delete(key.to_sym) if prefix_options.has_key?(key.to_sym)
+            end
           end
         end
 
