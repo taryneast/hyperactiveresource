@@ -242,7 +242,8 @@ class HyperactiveResource < ActiveResource::Base
     the_id = self.to_param # remember the id (or it gets lost in the next step)
     @attributes = {}  # clear out everything
     # go find myself and reload based on the set of attributes found
-    self.load(self.class.find(the_id, :params => @prefix_options).instance_variable_get('@attributes'))
+    conds = @prefix_options.blank? ? nil : {:params => @prefix_options}
+    self.load(self.class.find(the_id, conds).instance_variable_get('@attributes'))
   end
   
   # copy/pasted from http://dev.rubyonrails.org/attachment/ticket/7308/reworked_activeresource_update_attributes_patch.diff
@@ -260,7 +261,8 @@ class HyperactiveResource < ActiveResource::Base
   # fails because the resource is invalid then <tt>false</tt> will be returned. 
   #     
   def update_attribute(name, value) 
-    update_attributes(name => value)
+    self.send("#{name}=".to_sym, value)
+    self.save
   end 
  
   # Updates this resource withe all the attributes from the passed-in Hash and requests that 
@@ -678,7 +680,8 @@ class HyperactiveResource < ActiveResource::Base
     #This is a copy of the method out of ActiveResource::Base modified
     def load(attributes)
       raise ArgumentError, "expected an attributes Hash, got #{attributes.inspect}" unless attributes.is_a?(Hash)
-      @prefix_options, attributes = split_options(attributes)
+      # null-values are meaningful here, so merge in the keep-if-null option
+      @prefix_options, attributes = split_options(attributes.merge(:keep_if_null => true))
       attributes.each do |key, value|      
         @attributes[key.to_s] =
           case value
@@ -982,24 +985,40 @@ class HyperactiveResource < ActiveResource::Base
       def self.split_options(options = {})
         prefix_options, query_options = {}, {}
 
+        # When building URLs, we want to delete null-valued keys
+        # (eg :conditions => nil), but we want to be able to tell this 
+        # method not to do this if we're, say, building a set of attributes,
+        # and null-values are meaningful (eg :name => nil)
+        keep_if_null = options ? options.delete(:keep_if_null) : nil
+
         (options || {}).each do |key, value|
           next if key.blank?
+          # delete this key if the value is null, unless null-values are
+          # meaningful
+          next if value.blank? unless keep_if_null
+
           (prefix_parameters.include?(key.to_sym) ? prefix_options : query_options)[key.to_sym] = value
         end
+
         # It's possible that some of the prefix_options come through inside
-        # the :conditions - in which case - we still want them int he
+        # the :conditions - in which case - we still want them in the
         # prefix_options (though leave them otherwise).
-        if !options.blank? && options.respond_to?(:has_key?) && query_options.has_key?(:conditions) && !query_options[:conditions].blank?
+        if query_options.has_key?(:conditions) && !query_options[:conditions].blank?
           conds_to_keep = {}
-          query_options.delete(:conditions).each do |key, value|
-            if !key.blank? && !value.blank?
-              the_key = key.to_sym
-              # pull prefix params out of the conditions
-              prefix_options[the_key] = value if prefix_parameters.include?(the_key)
-              conds_to_keep[the_key] = value unless prefix_options.has_key?(the_key)
+          # only do this if we have a simple hash-based conditions.
+          # otherwise, it's too complicated to parse out the prefix-options.
+          # We'll just pass it through anyway
+          if query_options[:conditions].acts_like? :hash
+            query_options.delete(:conditions).each do |key, value|
+              if !key.blank?
+                the_key = key.to_sym
+                # pull prefix params out of the conditions
+                prefix_options[the_key] = value if prefix_parameters.include?(the_key)
+                conds_to_keep[the_key] = value unless prefix_options.has_key?(the_key)
+              end
             end
+            query_options[:conditions] = conds_to_keep unless conds_to_keep.blank?
           end
-          query_options[:conditions] = conds_to_keep unless conds_to_keep.blank?
         end
 
         [ prefix_options, query_options ]
