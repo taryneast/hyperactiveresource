@@ -264,6 +264,11 @@ class HyperactiveResource < ActiveResource::Base
     self.send("#{name}=".to_sym, value)
     self.save
   end 
+
+  # does an +update_attribute+, but raises +ResourceNotSaved+ if it fails
+  def update_attribute!(name, value)
+    update_attribute(name, value) || raise(ResourceNotSaved)
+  end
  
   # Updates this resource withe all the attributes from the passed-in Hash and requests that 
   # the record be saved. 
