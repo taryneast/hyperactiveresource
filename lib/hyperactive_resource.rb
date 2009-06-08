@@ -128,6 +128,35 @@ class HyperactiveResource < ActiveResource::Base
     super(options)
   end
 
+  # from_xml just returns a hash. We want it to actually instantiate the
+  # record - or a set of records from XML.
+  # Useful if we want to pull out a set of nested resources.
+  # Works either on a single object or a set of nested ones.
+  # Will return nil if it can't find a valid object or object-array of the
+  # type of the current class.
+  # 
+  # eg:
+  # Widget.from_xml('<widget><name>Thing</name></widget>')
+  # => #<Widget:0xb6e8f420 ... @attributes={"name"=>"Thing"}>
+  # Widget.from_xml('<widgets type="array"><widget><name>Thing</name></widget><widget><name>Thing2</name></widget></widgets>')
+  # => [#<Widget:0xb6e7b6c8 ... @attributes={"name"=>"Thing"}>, 
+  #     #<Widget:0xb6e7b740 ... @attributes={"name"=>"Thing2"}>
+  def self.from_xml(the_xml)
+    return nil if the_xml.blank?
+
+    attr_name = self.name.underscore
+    the_hash = Hash.from_xml(the_xml)
+    # returning a single item
+    if the_hash.has_key?(attr_name) 
+      return self.new(the_hash[attr_name])
+    # returning a collection
+    elsif the_hash.has_key?(attr_name.pluralize) 
+      return the_hash[attr_name.pluralize].map {|item| self.new(item) }
+    end
+    # otherwise there's nothing there (or something we didn't expect)
+    nil
+  end
+
 
   # validates_uniqeuness_of has to pull data out of the remote webserver
   # to test, so it has to be rewritten for ARes-style stuff.
