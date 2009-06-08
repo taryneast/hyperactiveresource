@@ -759,7 +759,7 @@ class HyperactiveResource < ActiveResource::Base
     #   => same as above, but returns the last one. (note - because we don't
     #   "sort" yet - this will fetch all of them and then return the last in
     #   the array.
-    FINDER_REGEXP = /^find_(all_by|last_by|by)_([_a-zA-Z]\w*)$/
+    FINDER_REGEXP = /^find_(all_by|first_by|last_by|by)_([_a-zA-Z]\w*)$/
 
     def self.method_missing( symbol, *args )
       # Dynamic finders
