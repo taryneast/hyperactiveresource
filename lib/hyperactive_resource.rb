@@ -573,6 +573,19 @@ class HyperactiveResource < ActiveResource::Base
         return column_getter_method_missing(name)
       end                                     
 
+      # when we call an attribute= on an attribute that is part of the
+      # nested option - store the new value in the @prefix_options
+      if self.nested
+        case name.to_s
+        when "#{self.nested}_id=" 
+          # if we've passed in a bare id
+          @prefix_options[name.to_s.first(-1)] = args.first
+        when "#{self.nested}=" 
+          # if we've passed an instance - just use the id
+          @prefix_options[name.to_s.first(-1)] = args.first.to_param
+        end
+      end
+
       super(name, *args)
     end
     
