@@ -950,17 +950,21 @@ class HyperactiveResource < ActiveResource::Base
           try_path = args[:counter_path] 
           args.delete(:counter_path)
         end
-        if !try_path.blank?
-          them = self.find(:one, args.merge(:from => try_path))
-          (them || []).count
+        # update the args to add our counter path.
+        # Note - don't disturb the original argments as we need them in the
+        # fallback option.
+        unless try_path.blank?
+          new_args = args.merge(:from => try_path)
         else
           # try the default counter path.
-          them = self.find(:one, :from => self.default_counter_path(args))
-          (them || []).count
+          new_args = {:from => self.default_counter_path(args)}
         end
-      rescue ActiveResource::ResourceNotFound
-        # if it all goes horribly, horribly wrong - fall back on the long way
-        (self.find(:all, args) || []).length
+        return self.find(:one, new_args).to_a.count
+      rescue ActiveResource::ResourceNotFound, ActiveResource::ServerError
+      # if we failed to find any, or the remote server exploded (eg on a bad
+      # route), we want to have one more go before falling over.
+      # Fetch them all out and check the length of the array
+        self.find(:all, args).to_a.length
       end
     end
 
