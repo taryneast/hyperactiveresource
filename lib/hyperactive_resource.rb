@@ -557,7 +557,10 @@ class HyperactiveResource < ActiveResource::Base
       return super if attributes.keys.include? name.to_s
 
       # if the name is in one of the associations sets
-      # Call the appropriate getter/setter to fetch the values
+      # Call the appropriate getter to fetch the values
+      # before we return it to the user
+      # This will store them on the object so a second call will not hit
+      # method_missing
       case name.to_sym
       when *self.belong_tos
         return belong_to_getter_method_missing(name)
@@ -623,7 +626,7 @@ class HyperactiveResource < ActiveResource::Base
 
       # if we're a nested resource - the id may have been snatched away
       # and stashed in the prefix_options
-      if self.nested.to_sym == association_name.to_sym
+      if self.nested && self.nested.to_sym == association_name.to_sym
         assn_id = (association_name+'_id').to_sym
         if !@prefix_options.blank? && @prefix_options.has_key?(assn_id)
           return call_setter( name, @prefix_options[assn_id])
@@ -735,7 +738,7 @@ class HyperactiveResource < ActiveResource::Base
     end
     # just returns the current value for "nested"
     def self.nested
-      @nested || false
+      @nested 
     end
 
     
@@ -981,7 +984,7 @@ class HyperactiveResource < ActiveResource::Base
     # foul of validation...
     def self.count(args = {})
       begin
-        raise "Must pass a nested-resource's id to count" if nested && !args.has_key?("#{nested.to_s.singularize}_id".to_sym)
+        raise "Must pass a nested-resource's id to count" if self.nested && !args.has_key?("#{nested.to_s.singularize}_id".to_sym)
         # try the neato way assuming a "count_widgets" collection path
         # has been passed in
         try_path = self.counter_path
