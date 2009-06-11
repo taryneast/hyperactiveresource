@@ -113,6 +113,14 @@ class HyperactiveResource < ActiveResource::Base
     @prefix_options = {}
     load(attributes)
   end                             
+
+  # I always thought it was stupid that AR couldn't initialize from an
+  # instance of itself :P
+  def self.new(stuff = {})
+    return stuff.dup if stuff.is_a? self
+    super(stuff)
+  end
+
   
   #This is required to make it behave like ActiveRecord
   def attributes=(new_attributes)    
@@ -143,6 +151,8 @@ class HyperactiveResource < ActiveResource::Base
   #     #<Widget:0xb6e7b740 ... @attributes={"name"=>"Thing2"}>
   def self.from_xml(the_xml)
     return nil if the_xml.blank?
+    # not xml - already one of us
+    return the_xml if the_xml.is_a?(self) || the_xml.acts_like?(:array) && the_xml[0].is_a?(self)
 
     attr_name = self.name.underscore
     the_hash = Hash.from_xml(the_xml)
