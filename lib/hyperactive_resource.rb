@@ -7,6 +7,21 @@ module Deprecation
   self.extend ActiveSupport::Deprecation
 end
 
+
+class Object
+  # Makes sure the object you're arrayifying is definitely an array
+  # {:x => 1, :y => 1}.arrayify
+  # => [{:x => 1, :y => 1}]
+  #
+  # Note to_a does not do this - it catss the existing object into an array,
+  # which is probably not what you want!
+  # {:x => 1, :y => 1}.to_a
+  # => [[:x, 1], [:y, 1]]
+  def arrayify
+    self.acts_like?(:array) ? self : [self]
+  end
+end
+
 #--
 # Below adds the README file into the rdoc for this class
 #++
@@ -16,6 +31,7 @@ class HyperactiveResource < ActiveResource::Base
   # Raised by ActiveRecord::Base.save! and ActiveRecord::Base.create! methods when record cannot be
   # saved because record is invalid.
   class ResourceNotSaved < AbstractRecordError; end
+  class ResourceNotFound < AbstractRecordError; end
 
   # Quick overloading of the ActiveRecord-style naming function for the
   # model in error messages.  This will be updated when associations are
@@ -126,6 +142,8 @@ class HyperactiveResource < ActiveResource::Base
   def attributes=(new_attributes)    
     attributes.update(new_attributes)
   end
+
+
    
   def to_xml(options = {})
     # fix for rails bug 2521 (auto dasherizing when no field passed in)
@@ -284,6 +302,14 @@ class HyperactiveResource < ActiveResource::Base
     conds = @prefix_options.blank? ? nil : {:params => @prefix_options}
     self.load(self.class.find(the_id, conds).instance_variable_get('@attributes'))
   end
+
+  # instance-method for count - used by the generic HyRes.count method
+  # when it returns a single, instantiated object that contains the count
+  # of the args given to it. This just pulls the count out of the
+  # attributes hash (if present).
+  def count
+    @attributes[:count]
+  end
   
   # copy/pasted from http://dev.rubyonrails.org/attachment/ticket/7308/reworked_activeresource_update_attributes_patch.diff
   #
@@ -292,9 +318,6 @@ class HyperactiveResource < ActiveResource::Base
   # Note: Unlike ActiveRecord::Base.update_attribute, this method <b>is</b> subject to normal validation 
   # routines as an update sends the whole body of the resource in the request.  (See Validations). 
   # As such, this method is equivalent to calling update_attributes with a single attribute/value pair. 
-  # 
-  # Note: Also unlike ActiveRecord::Base, ActiveResource currently uses string versions of attribute 
-  # names, so use <tt>update_attribute("name", "ryan")</tt> <em>instead of</em> <tt>update_attribute(:name, "ryan")</tt>. 
   # 
   # If the saving fails because of a connection or remote service error, an exception will be raised.  If saving 
   # fails because the resource is invalid then <tt>false</tt> will be returned. 
@@ -673,6 +696,9 @@ class HyperactiveResource < ActiveResource::Base
         the_klass.send(collection_finder_method, self.id)
       end
     end
+
+
+
     # quickie helper to turn a given name into a class constant
     # eg :user_id => <User>
     # Useful when you have a foreign-key and want the association.
@@ -839,18 +865,18 @@ class HyperactiveResource < ActiveResource::Base
     # etc every time
     def self.find_every(options)
       begin
-        from_value = options.respond_to?(:has_key?) && options.has_key?(:from) ? options[:from].delete : nil
+        from_value = options.respond_to?(:has_key?) && options.has_key?(:from) ? options.delete(:from) : nil
         case from_value
         when Symbol
-          instantiate_collection(get(from, options[:params]))
+          instantiate_collection(get(from_value, options[:params]))
         when String
-          path = "#{from}#{query_string(options[:params])}"
-          instantiate_collection(connection.get(path, headers) || [])
+          path = "#{from_value}#{query_string(options[:params])}"
+          instantiate_collection(connection.get(path, headers).arrayify)
         else
           prefix_options, query_options = split_options(options)
           suffix_options = query_options.delete(:suffix_options)
           path = collection_path(prefix_options, query_options, suffix_options)
-          instantiate_collection( (connection.get(path, headers) || []), prefix_options )
+          instantiate_collection( (connection.get(path, headers).arrayify), prefix_options )
         end
       rescue ActiveResource::ResourceNotFound
         # We should be swallowing RecordNotFound exceptions and returning
@@ -912,6 +938,7 @@ class HyperactiveResource < ActiveResource::Base
       merged_conditions
     end
 
+
     # Counts the number of items in your API that match the given
     # conditions. 
     #
@@ -959,12 +986,17 @@ class HyperactiveResource < ActiveResource::Base
           # try the default counter path.
           new_args = {:from => self.default_counter_path(args)}
         end
-        return self.find(:one, new_args).to_a.count
-      rescue ActiveResource::ResourceNotFound, ActiveResource::ServerError
-      # if we failed to find any, or the remote server exploded (eg on a bad
-      # route), we want to have one more go before falling over.
-      # Fetch them all out and check the length of the array
-        self.find(:all, args).to_a.length
+        them = self.find(:one, new_args)
+        # find_every now swallows not-found errors, so we may need to
+        # manually raise it to get into the failure block (below)
+        raise HyperactiveResource::ResourceNotFound if them.blank?
+        them.count.to_i
+      rescue HyperactiveResource::ResourceNotFound, ActiveResource::ResourceNotFound, 
+        ActiveResource::ServerError
+        # if we failed to find any, or the remote server exploded (eg on a bad
+        # route), we want to have one more go before falling over.
+        # Fetch them all out and check the length of the array
+        self.find(:all, args).arrayify.length
       end
     end
 
