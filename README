@@ -20,7 +20,7 @@ This code could indeed go directly into ActiveResource, but given some of
 the implementations that would put a dependancy between the two which may
 be resolved once Rails 3.0 comes out. It is expected that the common code
 (eg callbacks and validations) should be pulled out into a common mixin
-module, with AR and ARes both onbly overrriding those that are specific to
+module, with AR and ARes both only overrriding those that are specific to
 their own ORM...  
 There's nothing stopping this code from being integrated back into ARes in
 that fashion, but until then, this serves as an alternative that can be
@@ -35,7 +35,9 @@ experimental and still under construction.
 These are the features that have been added to HyRes. 
 
 == Base functions  
- * save! / update_attributes!   (raises HyperactiveResource::ResourceNotSaved on failure)
+ * update_attribute / update_attributes (actually exist now!)
+ * save! / update_attributes! / update_attribute! 
+    (raises HyperactiveResource::ResourceNotSaved on failure)
  * ModelName.count (still experimental) - with optional finder-args
     - override the default counter_path with your own (see example below)
  * updated collection_path that allows suffix_options as well as
@@ -145,6 +147,42 @@ those parameters.
 
 
 If you have a nested route for nested resources, you can use a prefix path
+
+
+
+
+
+== count and Your API
+
+There are several ways that HyRes.count can work with your API.
+The simplest would be to implement a count action on your remote API that
+returns a result including an attribute of "count".
+
+If your API is implemented in Rails, this would be the equivalent of doing:
+
+  def count
+    @widgets = Widget.all(filters)
+    respond_to do |format|
+      format.xml  { render :xml => { :count => @widgets.count } }
+    end
+  end
+
+Note the filters - if you want to pass conditions to your API, it's a good
+idea to filter based on them.
+
+Even if your API is not implemented in rails - as long as it responds
+appropriately to an action as per the above, count will "just work".
+
+
+If you don't have the liberty of updating the remote API, and the API
+implements a different path, you can pass the counter_path as an argument,
+eg:
+Widget.count(:counter_path => '/widgets/my_counter_path.xml')
+
+
+Finally - if none of the above work for you - count will actually just pull
+out all the items that match your arguments... and count the length of the
+array.
 
 
 
