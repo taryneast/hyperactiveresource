@@ -137,6 +137,14 @@ class HyperactiveResource < ActiveResource::Base
     super(stuff)
   end
 
+  # Creates an object just like HyRes.create but calls save! instead of save
+  # so an exception is raised if the record is invalid.
+  def self.create!(*args)
+    self.new(attributes).tap { |resource| resource.save! }
+  end
+
+
+
   
   #This is required to make it behave like ActiveRecord
   def attributes=(new_attributes)    
@@ -832,46 +840,112 @@ class HyperactiveResource < ActiveResource::Base
     def attribute_setter?(method)
       columns.include?(method.to_s.gsub(/=$/, '').to_sym)
     end
-      
 
   
-    # add dynamic finders.
+    # add dynamic finders straight out of active record
+    # This file just contains the matchers - which is really just a set of
+    # RegExes that will apply to HyRes as easily as AR
+    load "active_record/dynamic_finder_match.rb"
+
+    # constructs an attributes hash from a set of attribute names and
+    # arguments.
+    # Copied directly from ActiveRecord.
+    def self.construct_attributes_from_arguments(attribute_names, arguments)
+      attributes = {}
+      attribute_names.each_with_index { |name, idx| attributes[name.to_sym] = arguments[idx] }
+      attributes
+    end
+
+
+    # Set up method_missing to match a method-name based on the allowed
+    # dynamic finders.
+    #
     # This allows:
     #  User.find_all_by_email('joe@bloggs.com')
     #   => returns all users with the matching parameter
     #  User.find_by(:email, 'joe@bloggs.com')
-    #   => returns the first matching user
+    #   => both return the first matching user
     #  User.find_last_by(:email, 'joe@bloggs.com')
     #   => same as above, but returns the last one. (note - because we don't
     #   "sort" yet - this will fetch all of them and then return the last in
     #   the array.
-    FINDER_REGEXP = /^find_(all_by|first_by|last_by|by)_([_a-zA-Z]\w*)$/
+    #  User.find_all_by_email!('joe@bloggs.com')
+    #   => adding a bang to the end will cause it to raise a
+    #      ResourceNotFound if none were found!
+    #  User.find_all_by_name_and_email('Joe', 'joe@bloggs.com')
+    #   => returns users that match both given criteria (can pass any number
+    #      of arguments)
+    #  User.find_or_create_by_name('Joe')
+    #   => will try to find it - and if it doesn't exist... will create it
+    #      instead.
+    #  User.find_or_create_by_name!('Joe')
+    #   => same as above, but will user create! and therefore raise an
+    #      exception if creation fails
+    def self.method_missing(method_name, *args )
+      if match = ActiveRecord::DynamicFinderMatch.match(method_name)
+        attribute_names = match.attribute_names
+        # TODO - this is a Good Idea - but needs implementing
+        # super unless all_attributes_exist?(attribute_names)
 
-    def self.method_missing( symbol, *args )
-      # Dynamic finders
-      if symbol.to_s =~ FINDER_REGEXP 
-        finder_text, field_name = symbol.to_s.scan(FINDER_REGEXP).first #The ^ and $ mean only one thing will ever match this expression so use the first
-        scope = :first # matches when 'find_by' or 'find_first_by'
-        case finder_text 
-        when 'last_by' 
-          scope = :last
-        when 'all_by' 
-          scope = :all
-        end
-        # correctly generate a new set of conditions - based on passed-in
-        # arguments
-        if 0 == args.length
-          raise "Need to supply a find_by value for #{symbol}"
-        end
-        conds = { field_name => args[0] }
-        if args.length > 1
-          new_args = args.slice(1..-1)
-          conds = merge_conditions(conds, *new_args)
-        end
-        return find( scope, :conditions => conds)
+        # If we asked for a finder (eg find_all_by_X)
+        if match.finder?
+          finder_scope = match.finder
+          opts = args.extract_options! # pop the hash off the end
+          # construct conditions from given attributes
+          attr_conds = construct_attributes_from_arguments attribute_names, args
+          # merge them in with any existing conditions
+          opts[:conditions] = (opts.delete(:conditions) || {}).merge(attr_conds)
+
+          # and send them to the finder in the chosen scope
+          results = self.find(finder_scope, opts)
+
+          # the user asked for find! and we found nothing - so raise a
+          # descriptive exception
+          raise ResourceNotFound, "Couldn't find #{self.name} with #{attr_conds.to_a.collect {|pair| "#{pair.first} = #{pair.second}"}.join(', ')}" if match.bang? && results.blank?
+
+          # otherwise return whatever we found
+          return results
+
+        # if we asked for an instantiator (eg find_or_create_by_X)
+        elsif match.instantiator?
+          # We need to save the values from the match object as it'll
+          # all be lost as soon as we try the finder!
+          # first figure out which instantiator method we're using
+          instantiator = match.instantiator # either :new or :create
+          # add the bang to the method name if requested 
+          # (and it's not silly eg new!)
+          instantiator = (instantiator.to_s + "!").to_sym if match.bang? && (:create == instantiator)
+
+          # the finder method name is the same as the one they've used on
+          # the way in - but without the find/instantiate codeword swapped
+          # for the "first" codeword (so we only find one)
+          finder_method_name = method_name.to_s.gsub(/or_(create|instantiate)_/,'')
+
+          # first try finding the object
+          begin
+            # try finding it first
+            # and send them to the finder in the chosen scope
+            result = self.send(finder_method_name, args)
+            # if we found one - we're done.
+            return result unless result.blank?
+          rescue ResourceNotFound => msg
+            # swallow a resource-not-found - we need to try and create one
+          end
+          # we get here if we didn't find one... so now create it
+
+          # massage the opts into something creatable
+          opts = args.extract_options! # pop the hash off the end
+          # make a hash of the given attributes :)
+          attr_conds = construct_attributes_from_arguments attribute_names, args
+          # merge them in with any existing conditions
+          opts[:conditions] = (opts.delete(:conditions) || {}).merge(attr_conds)
+
+          # give it a whirl and send back the results
+          return self.send(instantiator, opts)
+
+        end # we asked for an instantiator
       else
-        
-        super( symbol, args )
+        super( method_name, args )
       end
     end
 

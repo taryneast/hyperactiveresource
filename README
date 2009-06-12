@@ -36,7 +36,7 @@ These are the features that have been added to HyRes.
 
 == Base functions  
  * update_attribute / update_attributes (actually exist now!)
- * save! / update_attributes! / update_attribute! 
+ * save! / update_attributes! / update_attribute! / create!
     (raises HyperactiveResource::ResourceNotSaved on failure)
  * ModelName.count (still experimental) - with optional finder-args
     - override the default counter_path with your own (see example below)
@@ -60,8 +60,13 @@ These are the features that have been added to HyRes.
    Widget.find(:all, :conditions => {:colour => 'blue'}, :limit => 5)
    Depends on your API accepting the above filter fields and returning
    something sensible. See "find" doco below for more info
- * Dynamic finders: find_by_X, find_all_by_X, find_first_by_X, find_last_by_X
+ * Dynamic finders: find_by_X, find_all_by_X, find_by_X, find_last_by_X
      (relies on your API accepting filter fields. See "find" doco below for more info)
+ * Dynamic finders take any number of arguments using _and_: find_by_X_and_Y_and_Z 
+ * Dynamic instantiators: find_or_create_by_X OR find_and_instantiate_by_X
+     (also takes any number of args)
+ * Dynamic finders/instantiators take ! eg: find_or_create_by_X! will throw
+     a ResourceNotValid if create fails
  * no 404-explosion for collection-finders that don't return anything They
    just return nil (just like ActiveRecord). This includes finders for
    associations eg User.posts will return nil if the user hasn't any.
@@ -151,15 +156,46 @@ If you have a nested route for nested resources, you can use a prefix path
 
 
 
-== Dynamic finders: find_[all_|first_|last_]by_X
+== Dynamic finders: find_[by|all_by|first_by|last_by]_X
 
-HyRes supports very basic dynamic finders eg :
+HyRes supports dynamic finders/initiators as per ActiveRecord eg :
    find_all_by_name(<the_name>, opts)
 is functionally equivalent to:
    find(:all, opts.merge(:name => <the_name>))
 
-It currently will only support a *single* X (eg you can't use "_and_Y" as
-per ActiveRecord). That's on the TODO list...
+You can pass in any number of arguments eg:
+   find_last_by_name_and_phone_and_email(the_name, the_phone, the_email)
+
+Adding a bang on the end:
+   find_last_by_name_and_phone_and_email!(the_name, the_phone, the_email)
+Will forcee it to raise an exception (ResourceNotFound) if there isn't one
+to be found.
+
+
+== Dynamic instantiators: find_[or_create|or_instantiate]_by_X
+
+You can also create/instantiate using:
+   find_or_create_by_name(<the_name>, opts)
+
+This will try to find the first resource matching the given attribute and
+options, and will create it (using the options) if it doesn't exist)
+
+If you end it in a bang:
+   find_or_create_by_name!(<the_name>, opts)
+
+It will call create! instead of create and thus raise an exception if create
+fails.
+
+
+By contrast using:
+   find_or_instantiate_by_name(<the_name>, opts)
+
+will work the same way - but will call "new" instead of "create" - which
+allows you to do more to it before it is saved.
+Obviously new! is meaningless so a bang on the end does nothing.
+
+   
+
 
 
 
@@ -323,10 +359,6 @@ blow away any pre-existing prefix-path... so use at your own peril ;)
 
 9) validates_associated (as per AR)
 
-10) find_by_X_and_Y - add the "and_Y" aspect of dynamic finders to allow a
-user to pass in any number of attributes to find-by
-
-11) find_or_create_by_X - shouldn't be *too* hard to find_or_create...
 
 
 N) merge this stuff back into the real ActiveResource
