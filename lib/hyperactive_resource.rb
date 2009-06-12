@@ -912,9 +912,7 @@ class HyperactiveResource < ActiveResource::Base
           # all be lost as soon as we try the finder!
           # first figure out which instantiator method we're using
           instantiator = match.instantiator # either :new or :create
-          # add the bang to the method name if requested 
-          # (and it's not silly eg new!)
-          instantiator = (instantiator.to_s + "!").to_sym if match.bang? && (:create == instantiator)
+          do_bang = match.bang?
 
           # the finder method name is the same as the one they've used on
           # the way in - but without the find/instantiate codeword swapped
@@ -925,7 +923,7 @@ class HyperactiveResource < ActiveResource::Base
           begin
             # try finding it first
             # and send them to the finder in the chosen scope
-            result = self.send(finder_method_name, args)
+            result = self.send(finder_method_name, *args)
             # if we found one - we're done.
             return result unless result.blank?
           rescue ResourceNotFound => msg
@@ -937,12 +935,14 @@ class HyperactiveResource < ActiveResource::Base
           opts = args.extract_options! # pop the hash off the end
           # make a hash of the given attributes :)
           attr_conds = construct_attributes_from_arguments attribute_names, args
+          # figure out my own model name and pass as options.
           # merge them in with any existing conditions
-          opts[:conditions] = (opts.delete(:conditions) || {}).merge(attr_conds)
+          attr_conds = (opts.delete(:conditions) || {}).merge(attr_conds)
 
-          # give it a whirl and send back the results
-          return self.send(instantiator, opts)
-
+          resource = self.new(attr_conds)
+          # save (with bang if requested) it if we're not a "new"
+          do_bang ? resource.save! : resource.save unless :new == instantiator
+          return resource
         end # we asked for an instantiator
       else
         super( method_name, args )
