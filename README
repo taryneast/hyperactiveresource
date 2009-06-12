@@ -151,6 +151,19 @@ If you have a nested route for nested resources, you can use a prefix path
 
 
 
+== Dynamic finders: find_[all_|first_|last_]by_X
+
+HyRes supports very basic dynamic finders eg :
+   find_all_by_name(<the_name>, opts)
+is functionally equivalent to:
+   find(:all, opts.merge(:name => <the_name>))
+
+It currently will only support a *single* X (eg you can't use "_and_Y" as
+per ActiveRecord). That's on the TODO list...
+
+
+
+
 
 == count and Your API
 
@@ -258,13 +271,25 @@ blow away any pre-existing prefix-path... so use at your own peril ;)
     Address.first.phone # should return '555 1234'
 
     Address.count # returns 1
-    Address.count(:phone => '555 9876') # returns 0
+    Address.count(:conditions => {:phone => '555 9876'}) # returns 0
 
     bad_address = Address.create()
     bad_address.errors.full_messages.inspect # => "[\"Postcode can't be blank\", \"Phone can't be blank\"]"
+    Address.count(:conditions => {:phone => '555 1234'}) # returns 1
 
 
-    Address.count(:phone => '555 1234') # returns 1
+    # note - the sort will only work if your API accepts "sort" on the query string
+    l_addresses = Address.find_all_by_city('London', :sort => 'postcode')
+    l_postcodes = l_addresses.map(&:postcode).uniq
+    p "London postcodes: #{l_postcodes.map(&:to_s).to_sentence}"
+
+
+    # assuming you already have people set up in your remote API...
+    number_ten = Address.find(:first, :conditions => {
+      :street_address => "10 Downing street", :city => 'London'})
+    number_ten.people.each {|person| p "Living at #10 is: #{person.name}" }
+
+
   etc..
 
 
@@ -287,22 +312,21 @@ blow away any pre-existing prefix-path... so use at your own peril ;)
 
 5) MyModel.calculate/average/minimum/maximum etc
 
-6) accessors for associations eg for Widget has_many :wodgets should be able
-  to use: a_widget.wodgets
-  Currently that fails with: 
-  "NoMethodError: undefined method `quoted_table_name' for Widget:Class"
-  an ActiveRecord assumption that you have a table...
-
-7) reflections. There should be no reason why we can't re-use
+6) reflections. There should be no reason why we can't re-use
   ActiveRecord-style reflections for our associations. They are not
   SQL-specific. This will also allow a lot more code to automatically Just
   Work (eg an ActiveRecord could use "has_many :through" a HyRes)
 
-8) Split HyRes into Base and other grouped functions as per AR
+7) Split HyRes into Base and other grouped functions as per AR
 
-9) default_scope (as per AR)
+8) default_scope (as per AR)
 
-10) validates_associated (as per AR)
+9) validates_associated (as per AR)
+
+10) find_by_X_and_Y - add the "and_Y" aspect of dynamic finders to allow a
+user to pass in any number of attributes to find-by
+
+11) find_or_create_by_X - shouldn't be *too* hard to find_or_create...
 
 
 N) merge this stuff back into the real ActiveResource
