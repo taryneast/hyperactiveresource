@@ -376,33 +376,50 @@ class HyperactiveResource < ActiveResource::Base
     end
 
 
-    # overwrite the encoding function to massage our associations attributes
+    # overwrite the encoding function to massage our attributes
     # into a form that can be encoded nicely.
+    # Note - we now don't pass through any attributes except ones that are
+    # known to exist ont he backend... ie remove everything that is not a
+    # column or a known belongs_to association id
+    #
+    # If you want something to not be encoded - there is a parameter named
+    # 'skip_to_xml_for' which you can use by passing in any models you want
+    # to not appear int he encoding eg:
+    # Widget.skip_to_xml_for :wodget_id
+    #
+    # This seems to have been a rrequirement when we didn't auto-clean the
+    # attributes. probably an :include would be more appropriate now.
     def encode(opts = {})
-      # don't bother unless we have some
-      return super(opts) if self.belong_tos.blank?
 
-      massaged_attributes = attributes.dup
-      
-      # Massage patient.id into patient_id (for every belongs_to)
-      massaged_attributes.each do |key, value|
-        if self.belong_tos.include? key.to_sym
-          massaged_attributes["#{key}_id"] = value.id unless value.blank?
-          massaged_attributes.delete(key)       
-        elsif key.to_s =~ /^.*_ids$/
-          massaged_attributes.delete(key)        
+      # first start with only the attributes that are actual columns
+      massaged_attributes = attributes.dup.delete_if {|key,val| !self.class.columns.include?(key.to_sym) }
+
+      # add in the belong_to association ids - but only if we have any
+      unless self.belong_tos.blank?
+        # Massage patient.id into patient_id (for every belongs_to we have
+        # as an attribute)
+        self.belong_tos.each do |thing|
+          attr_name = thing.to_s.pluralize
+          if attributes.has_key?(attr_name)
+            the_things = attributes[attr_name]
+            massaged_attributes["#{key}_id"] = the_thing.to_param unless the_thing.blank?
+          elsif attributes.has_key?(attr_name+'_id')
+            the_thing_id = attributes[attr_name+'_id']
+            massaged_attributes["#{key}_id"] = the_thing_id unless the_thing_id.blank?
+          end
         end
       end
-      
+
       # Skip the things in the skip list
       massaged_attributes.delete_if {|key,value| skip_to_xml_for.include? key.to_sym }
+
       # the following is a copy of ARes's encode - but with our new attributes
       # It may need to be updated if we want to stay in line with ARes. :P
       case self.class.format
-        when ActiveResource::Formats[:xml]
-          self.class.format.encode(massaged_attributes, {:root => self.class.element_name}.merge(opts))
-        else
-          self.class.format.encode(massaged_attributes, opts)
+      when ActiveResource::Formats[:xml]
+        self.class.format.encode(massaged_attributes, {:root => self.class.element_name}.merge(opts))
+      else
+        self.class.format.encode(massaged_attributes, opts)
       end
     end
     
