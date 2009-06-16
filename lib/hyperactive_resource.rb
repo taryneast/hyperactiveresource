@@ -204,7 +204,7 @@ class HyperactiveResource < ActiveResource::Base
     configuration = {}
     configuration.update(attr_names.extract_options!)
 
-    validates_each(attr_names,configuration) do |record, attr_name, value|    
+    validates_each(attr_names,configuration) do |this_resource, attr_name, value|    
       # skip if we allow nil and value is nil
       if (!configuration.has_key?(:allow_nil) || (configuration[:allow_nil] && !value.blank?))
         # TODO: make the below work
@@ -212,19 +212,18 @@ class HyperactiveResource < ActiveResource::Base
         # Currently find just fetches *every* record and we then have to
         # hand-filter it... :P
 
-        match_set = self.find(:all, :conditions => { attr_name => value})
-        # arrayify if we returned a single item
-        match_set = [match_set] unless match_set.respond_to?(:[])
-        match_set.compact!
-        if !match_set.blank? # only bother if we found something
-          # there are two cases where there's no error.
-          # Firstly, if we found none matching at all
-          # Secondly, if we found one - but it's really the current record...
-          #   which will only occur if the ids match
-          # So we need to count the number of records returned that have the
-          # attribute we've passed in... but don't have our id.
-          record.errors.add the_attr, "has already been taken. Please choose another" unless 0 == match_set.count {|rec| (value == rec.send(attr_name)) && (record.id && rec.id != record.id) }
-        end
+        match_set = self.find(:all, :conditions => { attr_name => value}).arrayify.compact!
+
+        # trivial case - we didn't find any => this value's ok
+        return true if match_set.blank?
+
+        # there are two cases where there's no error.
+        # Firstly, if we found none matching at all
+        # Secondly, if we found one - but it's really the current record...
+        #   which will only occur if the ids match
+        # So we need to count the number of records returned that have the
+        # attribute we've passed in... but don't have our id.
+        this_resource.errors.add the_attr, "has already been taken. Please choose another" unless 0 == match_set.count {|rec| (value == rec.send(attr_name)) && (this_resource.id && rec.id != this_resource.id) }
       end
     end
   end
@@ -241,8 +240,7 @@ class HyperactiveResource < ActiveResource::Base
   def self.destroy_all(conditions = nil)
     matches = find(:all, :conditions => conditions)
     return true if matches.blank? # short circuit
-    matches = [matches] unless matches.respond_to?(:[]) # arrayify
-    matches.each { |object| object.destroy  }
+    matches.arrayify.each { |object| object.destroy  }
     true
   end
   # unlike ActiveRecord... there's no easy way to just delete without
@@ -1146,9 +1144,8 @@ class HyperactiveResource < ActiveResource::Base
       # only override it if we pass in something different
       return super(prefix_options, query_options) if suffix_options.blank?
 
-      suffix_options = [suffix_options] unless suffix_options.respond_to?(:join) # arrayify! - even if we're a string
       prefix_options, query_options = split_options(prefix_options) if query_options.nil?
-      "#{prefix(prefix_options)}#{collection_name}/#{suffix_options.join('/')}.#{format.extension}#{query_string(query_options)}"
+      "#{prefix(prefix_options)}#{collection_name}/#{suffix_options.arrayify.join('/')}.#{format.extension}#{query_string(query_options)}"
     end
 
     # a collection path for an existing instance may be different to that
