@@ -223,7 +223,7 @@ class HyperactiveResource < ActiveResource::Base
         #   which will only occur if the ids match
         # So we need to count the number of records returned that have the
         # attribute we've passed in... but don't have our id.
-        this_resource.errors.add the_attr, "has already been taken. Please choose another" unless 0 == match_set.count {|rec| (value == rec.send(attr_name)) && (this_resource.id && rec.id != this_resource.id) }
+        this_resource.errors.add the_attr, "has already been taken. Please choose another" unless 0 == match_set.count {|rec| (value == rec.send(attr_name)) && (this_resource.to_param && rec.to_param != this_resource.to_param) }
       end
     end
   end
@@ -394,7 +394,7 @@ class HyperactiveResource < ActiveResource::Base
 
       # add in the belong_to association ids - but only if we have any
       unless self.belong_tos.blank?
-        # Massage patient.id into patient_id (for every belongs_to we have
+        # Massage patient.to_param into patient_id (for every belongs_to we have
         # as an attribute)
         self.belong_tos.each do |thing|
           attr_name = thing.to_s.pluralize
@@ -433,7 +433,7 @@ class HyperactiveResource < ActiveResource::Base
             #We need to set a reference from this nested resource back to the parent  
 
             fk = self.respond_to?("#{nested_resource_name}_options") ? self.send("#{nested_resource_name}_options")[:foreign_key]  : "#{self.class.name.underscore}_id"
-            resource.send("#{fk}=", self.id)
+            resource.send("#{fk}=", self.to_param)
             @saved_nested_resources[nested_resource_name] << resource if resource.save
           end
         end
@@ -451,14 +451,20 @@ class HyperactiveResource < ActiveResource::Base
       self
     end
 
-    # Create (i.e., save to the remote service) the new resource.
+    # Create (i.e. save to the remote service) the new resource.
     def create
       return false unless self.valid?
       connection.post(collection_path, encode, self.class.headers).tap do |response|
-        self.id = id_from_response(response) 
+        # looks like load_attributes destroys the id/primary_key. So save
+        # here, and add back after everything else is done
+        saved_id = id_from_response(response) 
         save_nested
         load_attributes_from_response(response)
         merge_saved_nested_resources_into_attributes
+        # merge back the primary_key/id once we're done mucking about with
+        # the other attributes
+        # behind the scenes - id= really puts the value into the primary_key (not id)
+        self.id = saved_id
       end
       self
     end  
@@ -476,7 +482,7 @@ class HyperactiveResource < ActiveResource::Base
     
     def id_from_response(response)
       # response['Location'][/\/([^\/]*?)(\.\w+)?$/, 1] if response['Location'] 
-      Hash.from_xml(response.body).values[0]["id"]
+      Hash.from_xml(response.body).values[0][self.class.primary_key.to_s]
     end            
     
     def after_save
@@ -508,8 +514,17 @@ class HyperactiveResource < ActiveResource::Base
 
 
 
+    # The list of columns that this HyRes object will recognise is stored on
+    # this class accessor.
+    # Any attributes not on this list will not be sent to the remote API on
+    # create/update.
     class_inheritable_accessor :columns
-    self.columns = []
+    self.columns = [] #:nodoc:
+    
+    def self.column( names )
+      raise ArgumentError if names.blank?
+      self.columns << names
+    end 
 
 
     ####################################################################
@@ -517,22 +532,22 @@ class HyperactiveResource < ActiveResource::Base
     # Public functions
     ####################################################################
 
-    class_inheritable_accessor :has_manys
-    class_inheritable_accessor :nested_has_manys
-    class_inheritable_accessor :has_ones
-    class_inheritable_accessor :nested_has_ones
-    class_inheritable_accessor :belong_tos
-    class_inheritable_accessor :nested_resources
+    class_inheritable_accessor :has_manys #:nodoc:
+    class_inheritable_accessor :nested_has_manys #:nodoc:
+    class_inheritable_accessor :has_ones #:nodoc:
+    class_inheritable_accessor :nested_has_ones #:nodoc:
+    class_inheritable_accessor :belong_tos #:nodoc:
+    class_inheritable_accessor :nested_resources #:nodoc:
     class_inheritable_accessor :skip_to_xml_for
     
-    self.nested_resources = []
-    self.has_manys = []
-    self.nested_has_manys = []
-    self.has_ones = []
-    self.nested_has_ones = []
-    self.belong_tos = []
+    self.nested_resources = [] #:nodoc:
+    self.has_manys = [] #:nodoc:
+    self.nested_has_manys = [] #:nodoc:
+    self.has_ones = [] #:nodoc:
+    self.nested_has_ones = [] #:nodoc:
+    self.belong_tos = [] #:nodoc:
 
-    self.skip_to_xml_for = []
+    self.skip_to_xml_for = [] #:nodoc:
 
 
     # As per ActiveRecord - belongs_to allows you to associate one kind of
@@ -564,11 +579,6 @@ class HyperactiveResource < ActiveResource::Base
       raise ArgumentError if names.blank?
       self.has_manys << names
     end
-    
-    def self.column( names )
-      raise ArgumentError if names.blank?
-      self.columns << names
-    end 
         
   #  When you call any of these dynamically inferred methods 
   #  the first call sets it so it's no longer dynamic for subsequent calls
@@ -640,12 +650,12 @@ class HyperactiveResource < ActiveResource::Base
       call_setter(name, name.to_s.camelize.constantize.find(association_id))
     end
     
-    #Getter for a belong_to's id will return the object.id if it exists
+    #Getter for a belong_to's id will return the object.to_param if it exists
     def belong_to_id_getter_method_missing( name )
       #The assumption is that this will always be called with a name that ends in _id   
       association_name = self.class.remove_id name
-      # If there is the obj itself rather than the blah_id Use the blah.id for blah_id
-      return call_setter( name, attributes[association_name].id ) unless attributes[association_name].nil?
+      # If there is the obj itself rather than the blah_id Use the blah.to_param for blah_id
+      return call_setter( name, attributes[association_name].to_param ) unless attributes[association_name].nil?
 
       # if we're a nested resource - the id may have been snatched away
       # and stashed in the prefix_options
@@ -682,7 +692,7 @@ class HyperactiveResource < ActiveResource::Base
         my_klass_name = self.class.name.underscore
 
         my_klass_id = (my_klass_name + '_id').to_sym
-        opts = the_klass.nested && the_klass.nested == my_klass_name.to_sym ? {my_klass_id => self.id}  : nil
+        opts = the_klass.nested && the_klass.nested == my_klass_name.to_sym ? {my_klass_id => self.to_param}  : nil
 
         associated_models = association_ids.collect do |associated_id| 
           if opts
@@ -717,7 +727,7 @@ class HyperactiveResource < ActiveResource::Base
     # a collection-finder for a has-many associated collection.
     # Can take a name of: "widgets" OR "widget" or "widget_ids" and returns
     # the set of Widget objects associated with the current object (passing
-    # self.id to the widget finder)
+    # self.to_param to the widget finder)
     def collection_fetch(name)
       the_klass = self.class.foreign_key_to_class(name)
       my_klass_name = self.class.name.underscore
@@ -726,13 +736,13 @@ class HyperactiveResource < ActiveResource::Base
       # for this resource eg /users/:user_id/widgets)
       # add ourself into the options
       if the_klass.nested && the_klass.nested.to_sym == my_klass_name.to_sym
-        opts = {(my_klass_name+'_id').to_sym => self.id}
+        opts = {(my_klass_name+'_id').to_sym => self.to_param}
         the_klass.find_every(opts)
       else
         # otherwise use a standard collection finder - but pass in the
         # parent's id as a condition
         collection_finder_method = "find_all_by_#{my_klass_name}_id"
-        the_klass.send(collection_finder_method, self.id)
+        the_klass.send(collection_finder_method, self.to_param)
       end
     end
 
@@ -767,7 +777,7 @@ class HyperactiveResource < ActiveResource::Base
     
     def has_one_getter_method_missing( name )
       self.new? ? nil : 
-        call_setter( name, name.to_s.camelize.constantize.send("find_by_#{self.class.name.underscore}_id", self.id) )
+        call_setter( name, name.to_s.camelize.constantize.send("find_by_#{self.class.name.underscore}_id", self.to_param) )
     end
 
     #Convenience method used by the method_missing methods

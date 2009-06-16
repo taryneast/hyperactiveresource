@@ -276,16 +276,30 @@ blow away any pre-existing prefix-path... so use at your own peril ;)
     NOTE: don't use HyperactiveResource::Base... there isn't one (..yet)!
 
     class Address < HyperactiveResource
+      # declare API-access as per ActiveResource
       self.site = 'http://localhost:3001/'
+      self.primary_key = :uuid
+
+      # declare the columns we expect
       self.columns = [ :street_address, :city, :postcode, :phone, :email]
+
+      # declare any HyRes special overrides
       self.counter_path = 'address_count.xml' # override default count path
 
+      # add any associations
       belongs_to :country
       belongs_to :state
       has_many :people
 
+      # add validations
       validates_presence_of :postcode, :phone
       validates_uniqueness_of :email
+
+      # add callbacks
+      before_create :generate_uuid
+      def generate_uuid
+        self.uuid = UUIDTools::UUID.timestamp_create.to_s
+      end
     end
 
  3. Enjoy the magic
@@ -299,10 +313,12 @@ blow away any pre-existing prefix-path... so use at your own peril ;)
     Address.count # returns 0
 
     address = Address.new(:postcode => '12345', :phone => '555 1234')
+    address.uuid    # nil - uuid not generated yet
     address.country # nil instead of method_missing
     address.country_id = 5
-    address.country  # Returns Country.find(5)
-    address.save!    # returns true
+    address.country # Returns Country.find(5)
+    address.save!   # returns true
+    address.uuid    # a valid uuid!
 
     Address.first.phone # should return '555 1234'
 
@@ -360,8 +376,6 @@ blow away any pre-existing prefix-path... so use at your own peril ;)
 9) validates_associated (as per AR)
 
 10) write_attribute
-
-11) to_param/primary_key that works (id field hard-coded everywhere)
 
 
 
