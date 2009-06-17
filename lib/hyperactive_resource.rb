@@ -455,16 +455,9 @@ class HyperactiveResource < ActiveResource::Base
     def create
       return false unless self.valid?
       connection.post(collection_path, encode, self.class.headers).tap do |response|
-        # looks like load_attributes destroys the id/primary_key. So save
-        # here, and add back after everything else is done
-        saved_id = id_from_response(response) 
         save_nested
         load_attributes_from_response(response)
         merge_saved_nested_resources_into_attributes
-        # merge back the primary_key/id once we're done mucking about with
-        # the other attributes
-        # behind the scenes - id= really puts the value into the primary_key (not id)
-        self.id = saved_id
       end
       self
     end  
@@ -483,8 +476,8 @@ class HyperactiveResource < ActiveResource::Base
     def id_from_response(response)
       # response['Location'][/\/([^\/]*?)(\.\w+)?$/, 1] if response['Location'] 
       Hash.from_xml(response.body).values[0][self.class.primary_key.to_s]
-    end            
-    
+    end
+
     def after_save
     end
     
@@ -820,7 +813,15 @@ class HyperactiveResource < ActiveResource::Base
         #BEGIN ADDITION TO AR::BASE
         call_attribute_setter(key, value)
         #END ADDITION
+        if key.to_sym == self.class.primary_key.to_sym
+          @primary_key_value = value 
+        end
       end
+      # overwrite the primary_key if it's different from the default
+      # regardless of primary key - the 'id' attribute needs to be the same
+      # as the primary key
+      @attributes['id'] = self.id = @primary_key_value if @primary_key_value
+
       #BEGIN ADDITION TO AR::BASE
       result = yield self if block_given?
       #END ADDITION
@@ -843,10 +844,10 @@ class HyperactiveResource < ActiveResource::Base
     #Called by overriden load
     def convert_to_i_if_id_field( key, value )
       #This might be an id of an association, and if they are passing in a string it should be to_ied                        
-      if self.belong_to_ids.include? key and not( value.nil? or ( value.respond_to? :empty? and value.empty? ) )
-        return value.to_i
-      end
-      value
+      # if not - just pass it back straight away
+      return value unless self.belong_to_ids.include? key && (!value.nil? || (value.respond_to?(:empty?) && value.empty?))
+      # otherwise cast it to an int
+      value.to_i
     end
     
     #TODO Consolidate this with call_setter
