@@ -92,6 +92,9 @@ These are the features that have been added to HyRes.
    association collection_fetch.
 
 
+=== Other weird stuff
+ * raw_data(:format => X) - access the raw data sent by the remote
+     API (see explanation and use below)
 
 
 
@@ -264,6 +267,40 @@ blow away any pre-existing prefix-path... so use at your own peril ;)
 
 
 
+== Accessing the raw data objects from your remote API
+
+If your remote API serves up multiple formats or if you just really want to
+gets your hands dirty in the raw, un-decoded data that your remote API sends
+back - use the raw_data function.
+
+Without any arguments it'll just redo a self.get and return you the data in
+the default format - without decoding it.
+
+You can also use it to fetch the current resource in a chosen format by
+passing it in eg:
+
+raw_data(:format => :json)
+
+this is especially useful if you need to fetch a data stream that you want
+to send straight to the user eg:
+
+    respond_to do |format|
+      format.pdf do
+        file_data = @my_widget.raw_data(:format => :pdf)
+        send_data file_data, :type => :pdf, :filename => @my_widget.filename
+      end
+    end
+
+
+HyRes currently supports: :xml, :json and :pdf
+
+Note: PDF is not fully supported except in this raw format
+(eg you can't set the default format to pdf and expect it to work... though
+if you write a PdfFormat::encode function you can possibly do some neat
+things)...
+
+
+
 == Examples
 
  1. Install the plugin via:
@@ -375,7 +412,15 @@ blow away any pre-existing prefix-path... so use at your own peril ;)
 
 9) validates_associated (as per AR)
 
-10) write_attribute
+10) write_attribute that actually hits the remoteAPI ???
+
+11) a default format for when it doesn't understand how to deal with a given
+mime-formats? One which will just pass back the raw data and let you play
+with it?
+
+12) cache the raw (un-decoded) data onto the object so we don't have to do a
+second fetch? Or at least allow a universal attribute to be set that turns
+on cacheing
 
 
 

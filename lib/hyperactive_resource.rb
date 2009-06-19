@@ -7,6 +7,41 @@ module Deprecation
   self.extend ActiveSupport::Deprecation
 end
 
+module ActiveResource
+  module Formats
+    module PdfFormat
+      extend self
+
+      def extension
+        "pdf"
+      end
+
+      def mime_type
+        "application/pdf"
+      end
+
+      def encode(hash, options={})
+        hash.to_pdf(options)
+      end
+
+      def decode(pdf)
+        pdf
+      end
+
+
+      private
+        # Manipulate from_xml Hash, because xml_simple is not exactly what we
+        # want for Active Resource.
+        def from_pdf_data(data)
+          if data.is_a?(Hash) && data.keys.size == 1
+            data.values.first
+          else
+            data
+          end
+        end
+    end
+  end
+end
 
 class Object
   # Makes sure the object you're arrayifying is definitely an array
@@ -21,6 +56,24 @@ class Object
     self.acts_like?(:array) ? self : [self]
   end
 end
+
+# Overload the Connection to allow us to pass back raw data (ie without
+# decoding it) if we want
+module ActiveResource
+  class Connection
+
+    alias :old_get :get
+    # Execute a GET request.
+    # Used to get (find) resources.
+    def get(path, headers = {}, decode = true)
+      return old_get(path, headers) if decode
+      # otherwise just return the raw body of the request
+      request(:get, path, build_request_headers(headers, :get)).body
+    end
+  end
+end
+
+
 
 #--
 # Below adds the README file into the rdoc for this class
@@ -361,6 +414,30 @@ class HyperactiveResource < ActiveResource::Base
     save! 
   end
   
+  
+  # returns the raw data that the remote server returns for this object.
+  # This is much more useful for non-html formats (eg getting the resource
+  # in pdf-format so you can stream it to the user).
+  # To ask for different ofrmats, pass it as an option eg:
+  # raw_data(:conditions => {:site_id => 42}, :format => :pdf}
+  def raw_data(conds = {})
+
+    # if they've asked for a specific format - use that format, but
+    # without losing the general format.
+    if conds.has_key?(:format)
+      old_format = self.class.format
+      self.class.format = conds.delete(:format)
+    end
+
+    # go find myself by getting - but pass a "false" to tell it not to
+    # decode
+    result = self.class.connection.get(element_path(@prefix_params), self.class.headers, false)
+
+    # reset the format to the original
+    self.class.format = old_format if defined? old_format
+
+    result
+  end
 
 
 
@@ -503,8 +580,6 @@ class HyperactiveResource < ActiveResource::Base
     def before_save_or_validate
       #Do nothing
     end     
-    
-
 
 
     # The list of columns that this HyRes object will recognise is stored on
@@ -1158,6 +1233,7 @@ class HyperactiveResource < ActiveResource::Base
       prefix_options, query_options = split_options(prefix_options) if query_options.nil?
       "#{prefix(prefix_options)}#{collection_name}/#{suffix_options.arrayify.join('/')}.#{format.extension}#{query_string(query_options)}"
     end
+
 
     # a collection path for an existing instance may be different to that
     # for an uninitialized object - mainly becasue nested resources will
