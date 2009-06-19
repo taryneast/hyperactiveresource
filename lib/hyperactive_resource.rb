@@ -1018,7 +1018,7 @@ class HyperactiveResource < ActiveResource::Base
           # the finder method name is the same as the one they've used on
           # the way in - but without the find/instantiate codeword swapped
           # for the "first" codeword (so we only find one)
-          finder_method_name = method_name.to_s.gsub(/or_(create|instantiate)_/,'')
+          finder_method_name = method_name.to_s.gsub(/or_(create|initialize)_/,'')
 
           # first try finding the object
           begin
