@@ -42,6 +42,17 @@ module ActiveResource
     end
   end
 end
+class Array
+  def acts_like_array?
+    true
+  end
+end
+
+class Hash
+  def acts_like_hash?
+    true
+  end
+end
 
 class Object
   # Makes sure the object you're arrayifying is definitely an array
