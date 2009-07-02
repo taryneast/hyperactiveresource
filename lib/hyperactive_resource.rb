@@ -203,7 +203,7 @@ class HyperactiveResource < ActiveResource::Base
 
   # Creates an object just like HyRes.create but calls save! instead of save
   # so an exception is raised if the record is invalid.
-  def self.create!(*args)
+  def self.create!(attributes = {})
     self.new(attributes).tap { |resource| resource.save! }
   end
 
