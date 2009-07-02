@@ -1254,15 +1254,20 @@ class HyperactiveResource < ActiveResource::Base
       # split an option hash into two hashes, one containing the prefix options,
       # and the other containing the leftovers.
       def self.split_options(options = {})
+        return [{},{}] if options.blank? # trivial case
+
+        # check we've got valid options...
+        raise ArgumentError, "expected a Hash got: #{options.inspect}" unless options.acts_like? :hash
+
         prefix_options, query_options = {}, {}
 
         # When building URLs, we want to delete null-valued keys
         # (eg :conditions => nil), but we want to be able to tell this 
         # method not to do this if we're, say, building a set of attributes,
         # and null-values are meaningful (eg :name => nil)
-        keep_if_null = options ? options.delete(:keep_if_null) : nil
+        keep_if_null = options.delete(:keep_if_null)
 
-        (options || {}).each do |key, value|
+        options.each do |key, value|
           next if key.blank?
           # delete this key if the value is null, unless null-values are
           # meaningful
