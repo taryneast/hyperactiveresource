@@ -658,7 +658,12 @@ class HyperactiveResource < ActiveResource::Base
       raise ArgumentError if names.blank?
       self.has_manys << names
     end
-        
+    def self.has_one( name )
+      raise ArgumentError if name.blank?
+      raise ArgumentError if name.is_a?(Array) && name.length > 1
+      self.has_ones = name.arrayify!
+    end
+     
   #  When you call any of these dynamically inferred methods 
   #  the first call sets it so it's no longer dynamic for subsequent calls
   #  Ie. If there is residencies but no residency_ids
