@@ -768,7 +768,6 @@ class HyperactiveResource < ActiveResource::Base
         # first -double-check that the id-fetch didn't auto-load the
         # associated objects while finding the ids, otherwise we'll be
         # doubling up on finds.
-        association_name = self.class.remove_id(name).pluralize #(residency_ids => residencies)
         return attributes[name] if attributes.has_key?(name)
 
         # didn't find any, get them all via individual finds
