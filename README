@@ -2,30 +2,21 @@
 
 v0.2
 
-Many have said that ActiveResource is not really "complete". On the surface,
-this means that many standard ActiveRecord features are not implemented.
+Many have said that Active Resource is not really "complete". On the surface, this means that many standard Active Record features are not implemented.
 
-This makes the concept of swapping ActiveRecord for ActiveResource immensely
-difficult (and cludgy, hand-built, buggy etc etc)
+This makes the concept of swapping Active Record for Active Resource immensely difficult (and cludgy, hand-built, buggy etc etc)
 
-Arguably, a "complete" ActiveResource would behave like ActiveRecord or, as the
-rdoc for ActiveResource states "very similarly to Active Record".
+Arguably, a "complete" Active Resource would behave like Active Record or, as the rdoc for Activ eResource states "very similarly to Active Record".
 
-Hyperactive Resource is an extension to ActiveResource::Base and goes a long
-way towards the goal of an ActiveResource that behaves like ActiveRecord.
-It will slowly be updated with all the standard features of ActiveRecord
-until (someday) it can be used almost interchangeably.
+Hyperactive Resource is an extension to ActiveResource::Base and goes a long way towards the goal of an Active Resource that behaves like Active Record.
+It will slowly be updated with all the standard features of Active Record until (someday) it can be used almost interchangeably.
 
-This code could indeed go directly into ActiveResource, but given some of
-the implementations that would put a dependancy between the two which may
-be resolved once Rails 3.0 comes out. It is expected that the common code
-(eg callbacks and validations) should be pulled out into a common mixin
-module, with AR and ARes both only overrriding those that are specific to
-their own ORM...  
-There's nothing stopping this code from being integrated back into ARes in
-that fashion, but until then, this serves as an alternative that can be
-used, under the proviso that anyone using it realises that it's still
-experimental and still under construction.
+This code could indeed go directly into Active Resource - and a slow, drawn-out project to do this is currently underway (look out for some of these features arriving in Rails 3.0). This process understandably takes some time as some of the changes are fairly radical - and we don't want to go about upsetting existing systems.
+
+Until then, this plugin serves as an alternative that can be used, under the proviso that anyone using it realises that it's still experimental and still under construction.
+It's especially useful for people that don't want to wait until Rails is ready, but want to to start using the functionality right now.
+
+HyRes is built for (and intended for use with) the latest stable release of Rails pre-3.0
 
 
 
@@ -43,15 +34,15 @@ These are the features that have been added to HyRes.
  * updated collection_path that allows suffix_options as well as
    prefix_options = allows us to generate Rails-style named routes
  * no explosion for delete_all/destroy_all on a 404
- * ActiveRecord-like attributes= (updates rather than replaces)
- * ActiveRecord-like #load that doesn't #dup attributes (stores direct reference)
+ * Active Record-like attributes= (updates rather than replaces)
+ * Active Record-like #load that doesn't #dup attributes (stores direct reference)
  * reload that does a full clear/fetch to reload (also clears associations
    cache!)
 
 
 == Callbacks
  * Hooks for before_validate, before_save
- * Callback chaining a la ActiveRecord (still experimental - may have missed
+ * Callback chaining a la Active Record (still experimental - may have missed
    some, but you can definitely use "validate :my_validation_method")
 
 
@@ -68,7 +59,7 @@ These are the features that have been added to HyRes.
  * Dynamic finders/instantiators take ! eg: find_or_create_by_X! will throw
      a ResourceNotValid if create fails
  * no 404-explosion for collection-finders that don't return anything They
-   just return nil (just like ActiveRecord). This includes finders for
+   just return nil (just like Active Record). This includes finders for
    associations eg User.posts will return nil if the user hasn't any.
 
 
@@ -161,7 +152,7 @@ If you have a nested route for nested resources, you can use a prefix path
 
 == Dynamic finders: find_[by|all_by|first_by|last_by]_X
 
-HyRes supports dynamic finders/initiators as per ActiveRecord eg :
+HyRes supports dynamic finders/initiators as per Active Record eg :
    find_all_by_name(<the_name>, opts)
 is functionally equivalent to:
    find(:all, opts.merge(:name => <the_name>))
@@ -308,12 +299,12 @@ things)...
     cd path/to/rails_root/vendor/plugins
     git clone	git://github.com/taryneast/hyperactiveresource.git
 
- 2. Create a HyperactiveResource where you would normally use ActiveResource
+ 2. Create a HyperactiveResource where you would normally use Active Resource
     and define the meta-data/associations that drive the dynamic magic:
     NOTE: don't use HyperactiveResource::Base... there isn't one (..yet)!
 
     class Address < HyperactiveResource
-      # declare API-access as per ActiveResource
+      # declare API-access as per Active Resource
       self.site = 'http://localhost:3001/'
       self.primary_key = :uuid
 
@@ -385,6 +376,21 @@ things)...
 
 
 
+== What has been pulled into Rail 3.0
+
+Work is currently underway to pull some of this functionality back into
+Rails itself. These features have made it into 3.0 already - with all the
+others on the wishlist to follow.
+
+ * validations (using ActiveModel::Validations)
+ * validates callback (but not validates_on_create/update)
+ * save!
+ * all/first/last aliases for find(:all/:first/:last)
+ * nil instead an exception onf find_every
+
+Currently in progress (ie awaiting discussion on RailsCore):
+ * 'columns' - feeding method_missing so we don't get a NoMethodError exception when a known attribute is nil
+
 
 == TODOs
 
@@ -402,9 +408,9 @@ things)...
 5) MyModel.calculate/average/minimum/maximum etc
 
 6) reflections. There should be no reason why we can't re-use
-  ActiveRecord-style reflections for our associations. They are not
+  Active Record-style reflections for our associations. They are not
   SQL-specific. This will also allow a lot more code to automatically Just
-  Work (eg an ActiveRecord could use "has_many :through" a HyRes)
+  Work (eg an Active Record could use "has_many :through" a HyRes)
 
 7) Split HyRes into Base and other grouped functions as per AR
 
@@ -422,9 +428,11 @@ with it?
 second fetch? Or at least allow a universal attribute to be set that turns
 on cacheing
 
+13) HABTM - and the reverse (ie AR HABTM HyRes and HyRes HABTM AR) 
 
+14) has_many :through - and allowing AR's "through" to work as well
 
-N) merge this stuff back into the real ActiveResource
+N) merge this stuff back into the real Active Resource (currently underway for Rails 3.0)
 
 
 
