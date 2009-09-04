@@ -455,6 +455,11 @@ class HyperactiveResource < ActiveResource::Base
 
   protected   ##########################################################
 
+    # provided for compatibility with the new AR generate_message function
+    def self.self_and_descendants_from_active_record
+      [self]
+    end
+
     # used when somebody overloads the "attribute=" method and then wants to
     # save the value into attributes
     def write_attribute(key, value)
