@@ -666,7 +666,7 @@ class HyperactiveResource < ActiveResource::Base
     def self.has_one( name )
       raise ArgumentError if name.blank?
       raise ArgumentError if name.is_a?(Array) && name.length > 1
-      self.has_ones = name.arrayify!
+      self.has_ones = name.arrayify
     end
      
   #  When you call any of these dynamically inferred methods 
