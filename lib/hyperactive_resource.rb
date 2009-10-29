@@ -435,17 +435,19 @@ class HyperactiveResource < ActiveResource::Base
 
     # if they've asked for a specific format - use that format, but
     # without losing the general format.
+    old_format = nil
     if conds.has_key?(:format)
       old_format = self.class.format
       self.class.format = conds.delete(:format)
     end
 
-    # go find myself by getting - but pass a "false" to tell it not to
-    # decode
-    result = self.class.connection.get(element_path(@prefix_params), self.class.headers, false)
-
-    # reset the format to the original
-    self.class.format = old_format if defined? old_format
+    begin
+      # go find myself with a get - but pass a "false" to tell it not to decode
+      result = self.class.connection.get(element_path(@prefix_params), self.class.headers, false)
+    ensure
+      # no matter what happens, make sure we reset the format to the original
+      self.class.format = old_format if old_format.present?
+    end
 
     result
   end
