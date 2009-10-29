@@ -1202,14 +1202,21 @@ class HyperactiveResource < ActiveResource::Base
         them = self.find(:one, new_args)
         # find_every now swallows not-found errors, so we may need to
         # manually raise it to get into the failure block (below)
-        raise HyperactiveResource::ResourceNotFound if them.blank?
+        # We also need to catch the horrible 'id not recognised error' that
+        # is returned when /<wigets>/count.xml turns into
+        #      :params =>  {:id => 'count'}
+        # Thus we check if the returned object recognises the 'count' method
+        raise HyperactiveResource::ResourceNotFound if them.blank? || !them.respond_to?(:count)
+
+        # success!
         them.count.to_i
+
       rescue HyperactiveResource::ResourceNotFound, ActiveResource::ResourceNotFound, 
         ActiveResource::ServerError
         # if we failed to find any, or the remote server exploded (eg on a bad
         # route), we want to have one more go before falling over.
         # Fetch them all out and check the length of the array
-        self.find(:all, args).arrayify.length
+        self.all(args).arrayify.length
       end
     end
 
