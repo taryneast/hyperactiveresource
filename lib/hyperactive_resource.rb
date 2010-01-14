@@ -549,11 +549,13 @@ class HyperactiveResource < ActiveResource::Base
     # Create (i.e. save to the remote service) the new resource.
     def create
       return false unless self.valid?
+      run_callbacks(:before_create)
       connection.post(collection_path, encode, self.class.headers).tap do |response|
         save_nested
         load_attributes_from_response(response)
         merge_saved_nested_resources_into_attributes
       end
+      run_callbacks(:after_create)
       self
     end  
     
