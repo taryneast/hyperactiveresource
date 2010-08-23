@@ -38,6 +38,7 @@ These are the features that have been added to HyRes.
  * Active Record-like #load that doesn't #dup attributes (stores direct reference)
  * reload that does a full clear/fetch to reload (also clears associations
    cache!)
+ * now not only extract xml child but also xml attribute
 
 
 == Callbacks
@@ -61,6 +62,7 @@ These are the features that have been added to HyRes.
  * no 404-explosion for collection-finders that don't return anything They
    just return nil (just like Active Record). This includes finders for
    associations eg User.posts will return nil if the user hasn't any.
+ * add :post, :put and :delete options at find
 
 
 === Validations
@@ -118,6 +120,11 @@ Currently:
   because (obviously) we're not using SQL...
  * it's possible to still pass in :params => {:conditions => ...} (ie old
   code shouldn't break) but it's not essential anymore (too complicated).
+  
+if your api not restful enough you can custom find by option :post, :put and :delete
+Brands.find(:all, :from => '/brands/search.xml', :post => '<?xml version="1.0" encoding="UTF-8"?><search_params><region>EUR</region></search_params>')
+will send '<?xml version="1.0" encoding="UTF-8"?><search_params><region>EUR</region></search_params>' with method post to yoursite+'/brands/search.xml'
+and parse xml result
 
 
 
@@ -396,43 +403,9 @@ Currently in progress (ie awaiting discussion on RailsCore):
 
 0) Testing!
 
-1) proper callbacks for before/after save/create/validate etc rather than
-  bodgied-up functions called directly in the code
+1) more customizable
 
-2) MyModel.with_scope
-
-3) find(:include => ...)
-
-4) attr_protected/attr_accessible
-
-5) MyModel.calculate/average/minimum/maximum etc
-
-6) reflections. There should be no reason why we can't re-use
-  Active Record-style reflections for our associations. They are not
-  SQL-specific. This will also allow a lot more code to automatically Just
-  Work (eg an Active Record could use "has_many :through" a HyRes)
-
-7) Split HyRes into Base and other grouped functions as per AR
-
-8) default_scope (as per AR)
-
-9) validates_associated (as per AR)
-
-10) write_attribute that actually hits the remoteAPI ???
-
-11) a default format for when it doesn't understand how to deal with a given
-mime-formats? One which will just pass back the raw data and let you play
-with it?
-
-12) cache the raw (un-decoded) data onto the object so we don't have to do a
-second fetch? Or at least allow a universal attribute to be set that turns
-on cacheing
-
-13) HABTM - and the reverse (ie AR HABTM HyRes and HyRes HABTM AR) 
-
-14) has_many :through - and allowing AR's "through" to work as well
-
-N) merge this stuff back into the real Active Resource (currently underway for Rails 3.0)
+2) if method post or put and using methods 'find_by' automatically create xml data to send to API  
 
 
 
@@ -440,7 +413,11 @@ N) merge this stuff back into the real Active Resource (currently underway for R
 
 == Copyright and Authorship
 
-Author:: Taryn East
+Author:: Ibnul Qoyyim
+
+Forked from :
+
+Taryn East
 Copyright (c) 2009:: White Label Dating [http://whitelabeldating.com]
 
 Based on Work Done by Medical Decision Logic
