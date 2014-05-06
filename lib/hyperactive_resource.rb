@@ -103,7 +103,7 @@ class HyperactiveResource < ActiveResource::Base
   def self.human_name(options = {})
     self.name.humanize
   end
-  # Quick overloading of the ActvieRecord-style naming functions for
+  # Quick overloading of the ActiveRecord-style naming functions for
   # attributes in error messages.
   # This will be updated when associations are complete
   def self.human_attribute_name(attribute_key_name, options = {})
@@ -1026,7 +1026,7 @@ class HyperactiveResource < ActiveResource::Base
 
           # the user asked for find! and we found nothing - so raise a
           # descriptive exception
-          raise ResourceNotFound, "Couldn't find #{self.name} with #{attr_conds.to_a.collect {|pair| "#{pair.first} = #{pair.second}"}.join(', ')}" if match.bang? && results.blank?
+          raise ResourceNotFound, "Couldn't find #{self.name} with " + attr_conds.to_a.collect {|pair| "#{pair.first} = #{pair.second}"}.join(', ') if match.bang? && results.blank?
 
           # otherwise return whatever we found
           return results
@@ -1081,12 +1081,31 @@ class HyperactiveResource < ActiveResource::Base
     def self.find_every(options)
       begin
         from_value = options.respond_to?(:has_key?) && options.has_key?(:from) ? options.delete(:from) : nil
+        post_value = options.respond_to?(:has_key?) && options.has_key?(:post) ? options.delete(:post) : nil
+        put_value = options.respond_to?(:has_key?) && options.has_key?(:put) ? options.delete(:put) : nil
+        is_delete = options.respond_to?(:has_key?) && options.has_key?(:delete)
         case from_value
         when Symbol
-          instantiate_collection(get(from_value, options[:params]))
+          if !post_value.nil?
+            instantiate_collection(post(from_value, options[:params], post_value))
+          elsif !put_value.nil? 
+            instantiate_collection(put(from_value, options[:params], put_value))
+          elsif is_delete
+            instantiate_collection(delete(from_value, options[:params]))
+          else
+            instantiate_collection(get(from_value, options[:params]))
+          end
         when String
           path = "#{from_value}#{query_string(options[:params])}"
-          instantiate_collection(connection.get(path, headers).arrayify)
+          if !post_value.nil?
+            instantiate_collection(format.decode(connection.post(path, post_value, headers).body).arrayify)
+          elsif !put_value.nil? 
+            instantiate_collection(format.decode(connection.put(path, put_value, headers).body).arrayify)
+          elsif is_delete
+            instantiate_collection(connection.delete(path, headers).arrayify)
+          else
+            instantiate_collection(connection.get(path, headers).arrayify)
+          end
         else
           prefix_options, query_options = split_options(options)
           suffix_options = query_options.delete(:suffix_options)
